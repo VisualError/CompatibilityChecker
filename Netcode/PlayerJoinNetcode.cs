@@ -33,11 +33,11 @@ namespace CompatibilityChecker.Netcode
             string mods = lobby.GetData("mods");
             if (!mods.IsNullOrWhiteSpace())
             {
-                ModNotifyBase.logger.LogInfo("Lobby is modded. Getting mod List.");
                 serverModList = mods.Split("/@/");
-                foreach(string mod in serverModList)
+                ModNotifyBase.logger.LogWarning($"{lobby.GetData("name")} returned:");
+                foreach (string mod in serverModList)
                 {
-                    ModNotifyBase.logger.LogInfo(mod);
+                    ModNotifyBase.logger.LogWarning(mod);
                 }
             }
             return true;
@@ -55,17 +55,18 @@ namespace CompatibilityChecker.Netcode
 
         [HarmonyPatch(typeof(MenuManager), nameof(MenuManager.SetLoadingScreen))]
         [HarmonyPostfix]
-        public static void SetLoadingScreenPatch(ref MenuManager __instance, ref RoomEnter result)
+        public static void SetLoadingScreenPatch(ref MenuManager __instance, ref RoomEnter result, ref bool isLoading)
         {
             if(ModNotifyBase.ModList.Count == 0)
             {
                 ModNotifyBase.InitializeModList();
             }
-            if (result == RoomEnter.Error && serverModList != null)
+            if (result == RoomEnter.Error && serverModList != null && !isLoading)
             {
                 string[] missingMods = serverModList.Except(ModNotifyBase.ModListArray).ToArray();
                 string list = missingMods == null || missingMods.Length == 0 ? "None..?" : string.Join("\n", missingMods);
                 __instance.DisplayMenuNotification($"Failed to join modded crew!\n Missing mods:\n{list}", "[ Close ]");
+                ModNotifyBase.logger.LogError($"\nMissing mods from lobby {GameNetworkManager.Instance?.currentLobby.Value.GetData("name")}:\n{list}");
                 serverModList = null;
             }
         }
@@ -74,7 +75,7 @@ namespace CompatibilityChecker.Netcode
         [HarmonyPostfix]
         public static void timeoutPatch()
         {
-            if (GameNetworkManager.Instance.currentLobby != null)
+            if (GameNetworkManager.Instance.currentLobby != null && serverModList == null)
             {
                 serverModList = GameNetworkManager.Instance.currentLobby.Value.GetData("mods")?.Split("/@/");
             }
@@ -94,19 +95,17 @@ namespace CompatibilityChecker.Netcode
             {
                 yield break;
             }
-            RectTransform rect = lobbyManager.levelListContainer.GetComponent<RectTransform>();
-            LobbySlot[] lobbies = (LobbySlot[])UnityEngine.Object.FindObjectsOfType(typeof(LobbySlot));
-            yield return new WaitUntil(() => rect.childCount-1 == lobbies.Length && rect.childCount - 1 != 0 && !GameNetworkManager.Instance.waitingForLobbyDataRefresh);
-            foreach(LobbySlot slot in lobbies)
+            yield return new WaitUntil(() => (lobbyManager.levelListContainer.GetComponent<RectTransform>().childCount - 1 != 0) && (lobbyManager.levelListContainer.GetComponent<RectTransform>().childCount-1) == UnityEngine.Object.FindObjectsOfType(typeof(LobbySlot)).Length && !GameNetworkManager.Instance.waitingForLobbyDataRefresh);
+            foreach(LobbySlot slot in (LobbySlot[])UnityEngine.Object.FindObjectsOfType(typeof(LobbySlot)))
             {
-                ModNotifyBase.logger.LogInfo($"Got {slot.LobbyName.text}");
                 Lobby lobby = slot.thisLobby;
                 bool lobbyModded = !lobby.GetData("mods").IsNullOrWhiteSpace();
-                if (lobbyModded)
+                if (lobbyModded && !slot.LobbyName.text.Contains("[Checker]"))
                 {
-                    slot.LobbyName.text = $"[Compatibility Checker] {slot.LobbyName.text}";
+                    slot.LobbyName.text = $"[Checker]{slot.LobbyName.text}";
                 }
             }
+            RectTransform rect = lobbyManager.levelListContainer.GetComponent<RectTransform>();
             float newWidth = rect.sizeDelta.x;
             float newHeight = Mathf.Max(0, (rect.childCount - 1) * 42f);
             rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, newWidth);
@@ -183,7 +182,7 @@ namespace CompatibilityChecker.Netcode
                     gameObject.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, ___lobbySlotPositionOffset);
                     ___lobbySlotPositionOffset -= 42f;
                     LobbySlot componentInChildren = gameObject.GetComponentInChildren<LobbySlot>();
-                    componentInChildren.LobbyName.text = $"{(lobbyModded ? "[Compatibility Checker] " : "")}{lobbyName.Substring(0, Mathf.Min(lobbyName.Length, 40))}";
+                    componentInChildren.LobbyName.text = $"{(lobbyModded ? "[Checker]" : "")}{lobbyName.Substring(0, Mathf.Min(lobbyName.Length, 40))}";
                     componentInChildren.playerCount.text = string.Format("{0} / 4", currentLobby.MemberCount);
                     componentInChildren.lobbyId = currentLobby.Id;
                     componentInChildren.thisLobby = currentLobby;

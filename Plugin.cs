@@ -39,7 +39,6 @@ namespace CompatibilityChecker
             ModList = Chainloader.PluginInfos;
             foreach (BepInEx.PluginInfo info in ModList.Values)
             {
-                logger.LogInfo($"Getting {info.Metadata.GUID}");
                 ModListString += $"{info.Metadata.GUID}/@/";
             }
             ModListString = ModListString.Remove(ModListString.Length - 3, 3); // :3

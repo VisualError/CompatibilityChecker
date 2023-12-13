@@ -38,3 +38,6 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 
 # Version 1.0.3
 - Fixed server list not compatible with MoreCompany.
+
+# Version 1.0.4
+- Fixed more bugs.
