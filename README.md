@@ -46,3 +46,7 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 - Accesses the Thunderstore API for easier mod downloads (access the links from the logs/console).
 - Added a warning if you are using an outdated/unknown version of CompatibilityChecker.
 - Only shows you mods with the server-sided category using the Thunderstore API.
+
+# Version 1.0.6
+- Made logs more clear.
+- Removed lobby name limit on server list (Text overflow issue not fixed.)

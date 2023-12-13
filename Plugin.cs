@@ -70,6 +70,9 @@ namespace CompatibilityChecker
                         FindObjectOfType<MenuManager>().DisplayMenuNotification(warning, null);
                     }
                     ModListString += $"{package.Name}/@/";
+                }else if (package == null)
+                {
+                    ModListString += $"{info.Metadata.GUID}/@/";
                 }
                 //ModListString += $"{info.Metadata.Name}";
             }

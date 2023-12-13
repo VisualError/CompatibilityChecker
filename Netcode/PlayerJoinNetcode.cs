@@ -38,7 +38,13 @@ namespace CompatibilityChecker.Netcode
                 ModNotifyBase.logger.LogWarning($"{lobby.GetData("name")} returned:");
                 foreach (string mod in serverModList)
                 {
-                    ModNotifyBase.logger.LogWarning(mod);
+                    string newString = mod;
+                    Package package = ModNotifyBase.thunderStoreList?.FirstOrDefault(package => package.Name == mod);
+                    if (package != null)
+                    {
+                        newString = $"{mod} v{package.Versions[0].VersionNumber}";
+                    }
+                    ModNotifyBase.logger.LogWarning(newString);
                 }
             }
             return true;
@@ -65,8 +71,10 @@ namespace CompatibilityChecker.Netcode
             if (result == RoomEnter.Error && serverModList != null && !isLoading)
             {
                 string[] missingMods = serverModList.Except(ModNotifyBase.ModListArray).ToArray();
+                string[] couldBeIncompatible = ModNotifyBase.ModListArray.Except(serverModList).ToArray();
                 string list = missingMods == null || missingMods.Length == 0 ? "None..?" : string.Join("\n", missingMods);
-                __instance.DisplayMenuNotification($"Failed to join modded crew (Check logs/console for links)!\n Missing mods:\n{list}", "[ Close ]");
+                string incompList = couldBeIncompatible == null || couldBeIncompatible.Length == 0 ? "None." : string.Join("\n\t\t", couldBeIncompatible);
+                __instance.DisplayMenuNotification($"Modded crew\n(Check logs/console for links)!\n Missing mods:\n{list}", "[ Close ]");
                 ModNotifyBase.logger.LogError($"\nMissing server-sided mods from lobby {GameNetworkManager.Instance?.currentLobby.Value.GetData("name")}:");
                 foreach(string mod in missingMods)
                 {
@@ -74,10 +82,11 @@ namespace CompatibilityChecker.Netcode
                     Package package = ModNotifyBase.thunderStoreList?.FirstOrDefault(package => package.Name == mod);
                     if (package != null)
                     {
-                        errorString = $"{mod} Link: ({package.PackageUrl}) (D: {package.Versions[0].Downloads})";
+                        errorString = $"\n\t--Name: {mod}\n\t--Link: {package.PackageUrl}\n\t--Downloads: {package.Versions[0].Downloads}\n\t--Categories: [{string.Join(", ", package.Categories)}]";
                     }
                     ModNotifyBase.logger.LogError(errorString);
                 }
+                ModNotifyBase.logger.LogWarning($"Mods \"{GameNetworkManager.Instance?.currentLobby.Value.GetData("name")}\" may not be compatible with:\n\t\t{incompList}");
                 serverModList = null;
             }
         }
@@ -125,8 +134,17 @@ namespace CompatibilityChecker.Netcode
                 bool lobbyModded = !lobby.GetData("mods").IsNullOrWhiteSpace();
                 if (lobbyModded && !slot.LobbyName.text.Contains("[Checker]"))
                 {
-                    slot.LobbyName.text = $"[Checker]{slot.LobbyName.text}";
+                    slot.LobbyName.text = $"{slot.LobbyName.text} [Checker]";
                 }
+                ContentSizeFitter fitter = slot.gameObject.GetComponent<ContentSizeFitter>();
+                if (fitter == null)
+                {
+                    fitter = slot.gameObject.AddComponent<ContentSizeFitter>();
+                }
+                fitter.verticalFit = ContentSizeFitter.FitMode.Unconstrained;
+                fitter.horizontalFit = ContentSizeFitter.FitMode.Unconstrained;
+                //fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
+                //fitter.horizontalFit = ContentSizeFitter.FitMode.PreferredSize;
             }
             RectTransform rect = lobbyManager.levelListContainer.GetComponent<RectTransform>();
             float newWidth = rect.sizeDelta.x;
@@ -205,7 +223,7 @@ namespace CompatibilityChecker.Netcode
                     gameObject.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, ___lobbySlotPositionOffset);
                     ___lobbySlotPositionOffset -= 42f;
                     LobbySlot componentInChildren = gameObject.GetComponentInChildren<LobbySlot>();
-                    componentInChildren.LobbyName.text = $"{(lobbyModded ? "[Checker]" : "")}{lobbyName.Substring(0, Mathf.Min(lobbyName.Length, 40))}";
+                    componentInChildren.LobbyName.text = $"{lobbyName} {(lobbyModded ? "[Checker]" : "")}";
                     componentInChildren.playerCount.text = string.Format("{0} / 4", currentLobby.MemberCount);
                     componentInChildren.lobbyId = currentLobby.Id;
                     componentInChildren.thisLobby = currentLobby;
