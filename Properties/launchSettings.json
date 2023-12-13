@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "ModNotify": {
+      "commandName": "Executable",
+      "executablePath": "D:\\SteamLibrary\\steamapps\\common\\LethalDebug\\Lethal Company.exe"
+    }
+  }
+}
