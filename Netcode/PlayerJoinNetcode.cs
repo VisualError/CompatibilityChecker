@@ -42,16 +42,40 @@ namespace CompatibilityChecker.Netcode
             return true;
         }
 
+        [HarmonyPatch(typeof(GameNetworkManager), "ConnectionApproval")]
+        [HarmonyPostfix]
+        public static void JoinLobbyPostfix()
+        {
+            if(ModNotifyBase.ModList.Count == 0)
+            {
+                ModNotifyBase.InitializeModList();
+            }
+        }
+
         [HarmonyPatch(typeof(MenuManager), nameof(MenuManager.SetLoadingScreen))]
         [HarmonyPostfix]
         public static void SetLoadingScreenPatch(ref MenuManager __instance, ref RoomEnter result)
         {
+            if(ModNotifyBase.ModList.Count == 0)
+            {
+                ModNotifyBase.InitializeModList();
+            }
             if (result == RoomEnter.Error && serverModList != null)
             {
                 string[] missingMods = serverModList.Except(ModNotifyBase.ModListArray).ToArray();
                 string list = missingMods == null || missingMods.Length == 0 ? "None..?" : string.Join("\n", missingMods);
                 __instance.DisplayMenuNotification($"Failed to join modded crew!\n Missing mods:\n{list}", "[ Close ]");
                 serverModList = null;
+            }
+        }
+
+        [HarmonyPatch(typeof(MenuManager), "connectionTimeOut")]
+        [HarmonyPostfix]
+        public static void timeoutPatch()
+        {
+            if (GameNetworkManager.Instance.currentLobby != null)
+            {
+                serverModList = GameNetworkManager.Instance.currentLobby.Value.GetData("mods")?.Split("/@/");
             }
         }
 

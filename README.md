@@ -32,3 +32,6 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 # Version 1.0.1
 - Fixed server list scrolling.
 - Added server indicator if server host has CompatibilityChecker.
+
+# Version 1.0.2
+- Fixed not all mods being loaded by the BepInEx chainloader.

@@ -21,13 +21,6 @@ namespace CompatibilityChecker
         public static string[] ModListArray;
         private void Awake()
         {
-            ModList = Chainloader.PluginInfos;
-            foreach(BepInEx.PluginInfo info in ModList.Values)
-            {
-                ModListString += $"{info.Metadata.GUID}/@/";
-            }
-            ModListString = ModListString.Remove(ModListString.Length - 3, 3); // :3
-            ModListArray = ModListString.Split("/@/");
             if (instance == null)
             {
                 instance = this;
@@ -38,6 +31,18 @@ namespace CompatibilityChecker
             Logger.LogInfo("Modded servers with CompatibilityChecker will now notify you what mods are needed.");
             harmony.PatchAll(typeof(ModNotifyBase));
             harmony.PatchAll(typeof(PlayerJoinNetcode));
+        }
+
+        public static void InitializeModList()
+        {
+            ModList = Chainloader.PluginInfos;
+            foreach (BepInEx.PluginInfo info in ModList.Values)
+            {
+                logger.LogInfo($"Getting {info.Metadata.GUID}");
+                ModListString += $"{info.Metadata.GUID}/@/";
+            }
+            ModListString = ModListString.Remove(ModListString.Length - 3, 3); // :3
+            ModListArray = ModListString.Split("/@/");
         }
     }
 }
