@@ -14,6 +14,7 @@ namespace CompatibilityChecker.Netcode
     class PlayerJoinNetcode
     {
         static string[] serverModList = null;
+        static Coroutine currentCoroutine = null;
         [HarmonyPatch(typeof(GameNetworkManager), "SteamMatchmaking_OnLobbyCreated")]
         [HarmonyPrefix]
         public static bool OnLobbyCreated(Result result, ref Lobby lobby)
@@ -79,7 +80,43 @@ namespace CompatibilityChecker.Netcode
             }
         }
 
+        [HarmonyPatch(typeof(SteamLobbyManager), "LoadServerList")]
+        [HarmonyPostfix]
+        [HarmonyAfter("me.swipez.melonloader.morecompany")]
+        public static void loadserverListPatch(ref SteamLobbyManager __instance, ref Lobby[] ___currentLobbyList)
+        {
+            currentCoroutine = __instance.StartCoroutine(Thing(__instance));
+        }
+
+        public static IEnumerator Thing(SteamLobbyManager lobbyManager)
+        {
+            if(currentCoroutine != null)
+            {
+                yield break;
+            }
+            RectTransform rect = lobbyManager.levelListContainer.GetComponent<RectTransform>();
+            LobbySlot[] lobbies = (LobbySlot[])UnityEngine.Object.FindObjectsOfType(typeof(LobbySlot));
+            yield return new WaitUntil(() => rect.childCount-1 == lobbies.Length && rect.childCount - 1 != 0 && !GameNetworkManager.Instance.waitingForLobbyDataRefresh);
+            foreach(LobbySlot slot in lobbies)
+            {
+                ModNotifyBase.logger.LogInfo($"Got {slot.LobbyName.text}");
+                Lobby lobby = slot.thisLobby;
+                bool lobbyModded = !lobby.GetData("mods").IsNullOrWhiteSpace();
+                if (lobbyModded)
+                {
+                    slot.LobbyName.text = $"[Compatibility Checker] {slot.LobbyName.text}";
+                }
+            }
+            float newWidth = rect.sizeDelta.x;
+            float newHeight = Mathf.Max(0, (rect.childCount - 1) * 42f);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, newWidth);
+            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, newHeight);
+            currentCoroutine = null;
+            yield break;
+        }
+
         [HarmonyPatch(typeof(SteamLobbyManager), "loadLobbyListAndFilter")]
+        [HarmonyAfter("me.swipez.melonloader.morecompany")]
         [HarmonyPrefix]
         public static bool loadLobbyPrefixPatch(ref SteamLobbyManager __instance, ref Lobby[] ___currentLobbyList, ref float ___lobbySlotPositionOffset, ref IEnumerator __result)
         {
@@ -152,11 +189,6 @@ namespace CompatibilityChecker.Netcode
                     componentInChildren.thisLobby = currentLobby;
                 }
             }
-            RectTransform rect = __instance.levelListContainer.GetComponent<RectTransform>();
-            float newWidth = rect.sizeDelta.x;
-            float newHeight = Mathf.Max(0, (rect.childCount-1) * 42f);
-            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, newWidth);
-            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, newHeight);
             yield break;
         }
     }

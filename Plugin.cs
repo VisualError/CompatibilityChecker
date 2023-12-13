@@ -11,6 +11,7 @@ namespace CompatibilityChecker
 {
     [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
     [BepInProcess("Lethal Company.exe")]
+    [BepInDependency("me.swipez.melonloader.morecompany", BepInDependency.DependencyFlags.SoftDependency)]
     public class ModNotifyBase : BaseUnityPlugin
     {
         public static ModNotifyBase instance;

@@ -35,3 +35,6 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 
 # Version 1.0.2
 - Fixed not all mods being loaded by the BepInEx chainloader.
+
+# Version 1.0.3
+- Fixed server list not compatible with MoreCompany.
