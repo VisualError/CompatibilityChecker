@@ -35,7 +35,7 @@ namespace CompatibilityChecker
             }
             // Plugin startup logic
             Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
-            Logger.LogInfo("Modded servers will now notify you what mods are needed.");
+            Logger.LogInfo("Modded servers with CompatibilityChecker will now notify you what mods are needed.");
             harmony.PatchAll(typeof(ModNotifyBase));
             harmony.PatchAll(typeof(PlayerJoinNetcode));
         }

@@ -2,7 +2,7 @@
 
 ## Overview
 
-Enhances your multiplayer experience by notifying you of the required mods when failing to join modded servers.
+Enhances your multiplayer experience by notifying you of the required mods when failing to join modded servers. (Required both by host and client.)
 
 ## Features
 
@@ -24,3 +24,11 @@ Enhances your multiplayer experience by notifying you of the required mods when 
 If you encounter any issues or have suggestions for improvement, feel free to [report them on GitHub](https://github.com/VisualError/CompatibilityChecker/issues).
 
 Enjoy a more informed multiplayer experience with CompatibilityChecker!
+
+
+# Version 1.0.0
+- Initial release.
+
+# Version 1.0.1
+- Fixed server list scrolling.
+- Added server indicator if server host has CompatibilityChecker.
