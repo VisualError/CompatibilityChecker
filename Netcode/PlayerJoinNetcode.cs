@@ -1,12 +1,12 @@
 ﻿using BepInEx;
-using BepInEx.Logging;
 using HarmonyLib;
 using Steamworks;
 using Steamworks.Data;
-using Unity.Netcode;
 using UnityEngine;
 using System.Linq;
 using System.Collections;
+using UnityEngine.UI;
+
 
 namespace CompatibilityChecker.Netcode
 {
@@ -15,6 +15,7 @@ namespace CompatibilityChecker.Netcode
     {
         static string[] serverModList = null;
         static Coroutine currentCoroutine = null;
+
         [HarmonyPatch(typeof(GameNetworkManager), "SteamMatchmaking_OnLobbyCreated")]
         [HarmonyPrefix]
         public static bool OnLobbyCreated(Result result, ref Lobby lobby)
@@ -65,10 +66,32 @@ namespace CompatibilityChecker.Netcode
             {
                 string[] missingMods = serverModList.Except(ModNotifyBase.ModListArray).ToArray();
                 string list = missingMods == null || missingMods.Length == 0 ? "None..?" : string.Join("\n", missingMods);
-                __instance.DisplayMenuNotification($"Failed to join modded crew!\n Missing mods:\n{list}", "[ Close ]");
-                ModNotifyBase.logger.LogError($"\nMissing mods from lobby {GameNetworkManager.Instance?.currentLobby.Value.GetData("name")}:\n{list}");
+                __instance.DisplayMenuNotification($"Failed to join modded crew (Check logs/console for links)!\n Missing mods:\n{list}", "[ Close ]");
+                ModNotifyBase.logger.LogError($"\nMissing server-sided mods from lobby {GameNetworkManager.Instance?.currentLobby.Value.GetData("name")}:");
+                foreach(string mod in missingMods)
+                {
+                    string errorString = mod;
+                    Package package = ModNotifyBase.thunderStoreList?.FirstOrDefault(package => package.Name == mod);
+                    if (package != null)
+                    {
+                        errorString = $"{mod} Link: ({package.PackageUrl}) (D: {package.Versions[0].Downloads})";
+                    }
+                    ModNotifyBase.logger.LogError(errorString);
+                }
                 serverModList = null;
             }
+        }
+
+        [HarmonyPatch(typeof(MenuManager), nameof(MenuManager.DisplayMenuNotification))]
+        [HarmonyPostfix]
+        public static void DisplayMenuNotificationPostfix(ref MenuManager __instance)
+        {
+            ContentSizeFitter fitter = __instance.menuNotification.gameObject.GetComponent<ContentSizeFitter>();
+            if (fitter == null)
+            {
+                fitter = __instance.menuNotification.gameObject.AddComponent<ContentSizeFitter>();   
+            }
+            fitter.verticalFit = ContentSizeFitter.FitMode.PreferredSize;
         }
 
         [HarmonyPatch(typeof(MenuManager), "connectionTimeOut")]

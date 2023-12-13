@@ -41,3 +41,8 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 
 # Version 1.0.4
 - Fixed more bugs.
+
+# Version 1.0.5
+- Accesses the Thunderstore API for easier mod downloads (access the links from the logs/console).
+- Added a warning if you are using an outdated/unknown version of CompatibilityChecker.
+- Only shows you mods with the server-sided category using the Thunderstore API.
