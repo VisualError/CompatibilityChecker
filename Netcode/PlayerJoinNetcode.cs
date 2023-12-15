@@ -93,18 +93,28 @@ namespace CompatibilityChecker.Netcode
             {
                 serverModList = mods.Split(ModNotifyBase.seperator);
                 ModNotifyBase.logger.LogWarning($"{lobby.GetData("name")} returned:");
-                foreach (string mod in serverModList)
+                try
                 {
-                    string versionNumber = Regex.Match(mod, @"\[([\d.]+)\]").Success ? $"v{Regex.Match(mod, @"\[([\d.]+)\]").Groups[1].Value}" : "No version number found";
-                    string yourVersionNumber = Chainloader.PluginInfos[mod]?.Metadata.Version.ToString();
-                    string newString = mod;
-                    string incompatibilityString = !versionNumber.Equals(yourVersionNumber) ? $" (May be incompatible with your version v{yourVersionNumber})" : "";
-                    Package package = ThunderstoreAPI.GetPackage(mod);
-                    if (package != null)
+                    foreach (string mod in serverModList)
                     {
-                        newString = $"{mod} {versionNumber}{incompatibilityString}";
+                        string versionNumber = Regex.Match(mod, @"\[([\d.]+)\]").Success ? $"v{Regex.Match(mod, @"\[([\d.]+)\]").Value}" : "No version number found";
+                        string yourVersionNumber = "";
+                        if (Chainloader.PluginInfos.ContainsKey(mod))
+                        {
+                            yourVersionNumber = Chainloader.PluginInfos[mod]?.Metadata?.Version?.ToString();
+                        }
+                        string newString = mod;
+                        string incompatibilityString =  !yourVersionNumber.IsNullOrWhiteSpace() && !versionNumber.Equals(yourVersionNumber) ? $" (May be incompatible with your version v{yourVersionNumber})" : "";
+                        Package package = ThunderstoreAPI.GetPackage(mod);
+                        if (package != null)
+                        {
+                            newString = $"{mod} {versionNumber}{incompatibilityString}";
+                        }
+                        ModNotifyBase.logger.LogWarning(newString);
                     }
-                    ModNotifyBase.logger.LogWarning(newString);
+                }catch(Exception er)
+                {
+                    ModNotifyBase.logger.LogError(er);
                 }
             }
             return true;
