@@ -50,3 +50,21 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 # Version 1.0.6
 - Made logs more clear.
 - Removed lobby name limit on server list (Text overflow issue not fixed.)
+
+# Version 1.1.0
+
+- **Display Notification Aspect Ratio Fix:** Resolved aspect ratio issues with the display notification for a more consistent user experience.
+
+- **Enhanced Logs:** Logs now provide additional information, including `Mod.GUID`, `Mod.Version`, `Mod.Link`, and `Mod.Downloads`, offering more insight into the mods.
+
+- **Improved Thunderstore API Load Time:** Thunderstore API loading performance has been optimized for a faster experience.
+
+- **Refined Mod Dependency Handling:** The mod now sets required mods to server-side mods only, streamlining compatibility checks and improving overall functionality.
+
+- **Server-Side Mod Version Display:** CompatibilityChecker now displays the version information for each server-side mod the host has, giving users more transparency.
+
+- **Outdated Mods Notification:** Logs will now indicate if any of your mods are outdated, helping you stay up-to-date with the latest versions.
+
+- **In-Game CompatibilityChecker Status:** Receive in-game notifications if your CompatibilityChecker mod is outdated, ensuring you are aware of the latest updates.
+
+- **Server Compatibility Check:** CompatibilityChecker will inform you if the server you're joining doesn't have CompatibilityChecker installed, helping you make informed decisions about server compatibility.

@@ -4,13 +4,18 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>Ryokune.CompatibilityChecker</AssemblyName>
     <Description>Lethal Company Library that lets you know which mods a modded server has.</Description>
-    <Version>1.0.6</Version>
-    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Version>1.1.0</Version>
+    <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <PackageId>Ryokune.CompatibilityChecker</PackageId>
     <Authors>Ryokune</Authors>
     <Product>CompatibilityChecker</Product>
     <RootNamespace>CompatibilityChecker</RootNamespace>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|AnyCPU'">
+    <DebugType>full</DebugType>
+    <DebugSymbols>true</DebugSymbols>
   </PropertyGroup>
 
   <ItemGroup>
@@ -51,16 +56,17 @@
       <HintPath>D:\SteamLibrary\steamapps\common\Lethal Company\Lethal Company_Data\Managed\UnityEngine.UI.dll</HintPath>
     </Reference>
   </ItemGroup>
-
 	<Target Name="PostBuild" AfterTargets="PostBuildEvent">
-		<Exec Command="D:&#xD;&#xA;cd NetcodePatcher&#xD;&#xA;NetcodePatcher.dll $(TargetDir) deps/" />
+		<Exec Command="cd C:\pdb2mdb&#xD;&#xA;pdb2mdb &quot;$(TargetPath)&quot;" />
 		<CallTarget Targets="CopyDLL" Condition=" Exists('$(OutputPath)\$(AssemblyName).dll') " />
 		<CallTarget Targets="MoveToLethalDebug" Condition="'$(Configuration)' == 'Debug'" />
 	</Target>
 	<Target Name="CopyDLL">
 		<Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll" DestinationFolder="$(SolutionDir)\$(AssemblyName)" />
+		<Copy SourceFiles="$(OutputPath)\$(AssemblyName).dll.mdb" DestinationFolder="$(SolutionDir)\$(AssemblyName)" />
 	</Target>
 	<Target Name="MoveToLethalDebug">
 		<Copy SourceFiles="$(SolutionDir)\$(AssemblyName)\$(AssemblyName).dll" DestinationFolder="D:\SteamLibrary\steamapps\common\LethalDebug\BepInEx\plugins" />
+		<Copy SourceFiles="$(SolutionDir)\$(AssemblyName)\$(AssemblyName).dll.mdb" DestinationFolder="D:\SteamLibrary\steamapps\common\LethalDebug\BepInEx\plugins" />
 	</Target>
 </Project>
