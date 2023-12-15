@@ -165,7 +165,7 @@ namespace CompatibilityChecker.Utils
 
 		public static Package GetPackage(string searchString)
 		{
-			return Packages?.FirstOrDefault(package => package.Name == searchString);
+			return Packages?.FirstOrDefault(package => IsSimilar(package.Name, searchString));
 		}
 
 		public static Package GetPackage(string searchString, BepInEx.PluginInfo info)

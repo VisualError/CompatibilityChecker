@@ -68,3 +68,6 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 - **In-Game CompatibilityChecker Status:** Receive in-game notifications if your CompatibilityChecker mod is outdated, ensuring you are aware of the latest updates.
 
 - **Server Compatibility Check:** CompatibilityChecker will inform you if the server you're joining doesn't have CompatibilityChecker installed, helping you make informed decisions about server compatibility.
+
+# Version 1.1.1 (QuickFix)
+- **Fixed**: Infinite Loading Bug.

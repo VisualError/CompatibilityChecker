@@ -188,7 +188,8 @@ namespace CompatibilityChecker.Netcode
                         Package modPackage = ThunderstoreAPI.GetPackage(mod);
                         if (modPackage != null)
                         {
-                            errorString = $"\n\t--Name: {mod}\n\t--Link: {modPackage.PackageUrl}\n\t--Downloads: {modPackage.Versions[0].Downloads}\n\t--Categories: [{string.Join(", ", modPackage.Categories)}]";
+                            string versionNumber = Regex.Match(mod, @"\[([\d.]+)\]").Success ? $"v{Regex.Match(mod, @"\[([\d.]+)\]").Value}" : "No version number found";
+                            errorString = $"\n\t--Name: {mod}\n\t--Link: {modPackage.PackageUrl}\n\t--Version: {versionNumber}\n\t--Downloads: {modPackage.Versions[0].Downloads}\n\t--Categories: [{string.Join(", ", modPackage.Categories)}]";
                         }
                         ModNotifyBase.logger.LogError(errorString);
                     }
