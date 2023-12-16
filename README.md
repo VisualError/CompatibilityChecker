@@ -71,3 +71,9 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 
 # Version 1.1.1 (QuickFix)
 - **Fixed**: Infinite Loading Bug.
+
+# Version 1.1.4
+- **Fixed**: Missing mods logs not showing any information.
+- **Fixed**: Possible incompatible mods information should now show up in your mod logs.
+- **Added**: Lobby search functionality! YIPPIE!!!
+- **Next patch**: Join via lobby code.

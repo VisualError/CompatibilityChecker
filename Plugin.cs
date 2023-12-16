@@ -16,6 +16,7 @@ using System.Globalization;
 using System.Collections;
 using CompatibilityChecker.Utils;
 using CompatibilityChecker.MonoBehaviours;
+using UnityEngine.SceneManagement;
 
 namespace CompatibilityChecker
 {
@@ -24,19 +25,58 @@ namespace CompatibilityChecker
     public class ModNotifyBase : BaseUnityPlugin
     {
         public static ModNotifyBase instance;
-        public static ManualLogSource logger;
+        public static new ManualLogSource Logger;
         private readonly Harmony harmony = new Harmony(PluginInfo.PLUGIN_GUID);
         public static Dictionary<string, BepInEx.PluginInfo> ModList = new Dictionary<string, BepInEx.PluginInfo>();
         public static string ModListString;
         public static string[] ModListArray;
         public static bool loadedMods;
         public static string seperator = "/@/";
+        public static SearchBox ServerSearchBox;
+        public static string Text;
+        private static void OnEndEdit(string newValue)
+        {
+            // Handle the search value change here
+            Text = newValue;
+            SteamLobbyManager lobbyManager = FindObjectOfType<SteamLobbyManager>();
+            lobbyManager.LoadServerList();
+        }
+        static void sceneLoad(Scene sceneName, LoadSceneMode load)
+        {
+            if (sceneName.name == "MainMenu")
+            {
+                //GameObject obj = new GameObject("SearchBox");
+                //ServerSearchBox = obj.AddComponent<SearchBox>();
+                GameObject obj = GameObject.Find("/Canvas/MenuContainer/LobbyList/JoinCode");
+                if (obj != null)
+                {
+                    try
+                    {
+                        GameObject searchBoxObject = Instantiate(obj.gameObject, obj.transform.parent);
+                        searchBoxObject.SetActive(true);
+                        TMPro.TMP_InputField inputField = searchBoxObject.GetComponent<TMPro.TMP_InputField>();
+                        if(inputField != null)
+                        {
+                            inputField.interactable = true;
+                            inputField.placeholder.gameObject.GetComponent<TMPro.TextMeshProUGUI>().text = "Search or Enter a room code...";
+                            inputField.onSubmit = new TMPro.TMP_InputField.SubmitEvent();
+                            inputField.onSubmit.AddListener(OnEndEdit);
+                        }
+                    }catch(Exception err)
+                    {
+                        Logger.LogError(err);
+                    }
+                }
+            }
+        }
+
         private void Awake()
         {
+            SceneManager.sceneLoaded += sceneLoad;
             if (instance == null)
             {
                 instance = this;
-                logger = Logger;
+                Logger = base.Logger;
             }
             CoroutineHandler.Instance.NewCoroutine(ThunderstoreAPI.Initialize());
             // Plugin startup logic
@@ -67,7 +107,7 @@ namespace CompatibilityChecker
                 Package package = ThunderstoreAPI.GetPackage(noSpace, info);
                 if (package != null)
                 {
-                    logger.LogInfo($"[{info.Metadata.GUID}] Found package: {info.Metadata.Name}[{info.Metadata.Version}]\n\t\tDATA:\n\t\t--NAME: {package.FullName}\n\t\t--LINK: {package.PackageUrl}");
+                    Logger.LogInfo($"[{info.Metadata.GUID}] Found package: {info.Metadata.Name}[{info.Metadata.Version}]\n\t\tDATA:\n\t\t--NAME: {package.FullName}\n\t\t--LINK: {package.PackageUrl}");
                     if (VersionUtil.ConvertToNumber(package.Versions[0].VersionNumber) > VersionUtil.ConvertToNumber(info.Metadata.Version.ToString()))
                     {
                         messageBuilder.AppendLine($"\n\t\t--Mod {info.Metadata.Name} [{info.Metadata.GUID}] v{info.Metadata.Version} does not equal the latest release!");
@@ -82,25 +122,25 @@ namespace CompatibilityChecker
                     if (package.Name == PluginInfo.PLUGIN_NAME && package.Versions[0].VersionNumber != PluginInfo.PLUGIN_VERSION)
                     {
                         string warning = $"Current {PluginInfo.PLUGIN_NAME} v{PluginInfo.PLUGIN_VERSION} does not equal latest release v{package.Versions[0].VersionNumber}!\nPlease update to the latest version of {PluginInfo.PLUGIN_NAME}!!!";
-                        logger.LogWarning(warning);
+                        Logger.LogWarning(warning);
                         FindObjectOfType<MenuManager>().DisplayMenuNotification(warning, null);
                     }
                     ModListString += $"{info.Metadata.Name}[{info.Metadata.Version}]{seperator}";
                 }
                 else if (package == null)
                 {
-                    logger.LogWarning($"Couldn't find package: {info.Metadata.Name}[{info.Metadata.Version}]\n\t\t[{info.Metadata.GUID}]");
+                    Logger.LogWarning($"Couldn't find package: {info.Metadata.Name}[{info.Metadata.Version}]\n\t\t[{info.Metadata.GUID}]");
                     ModListString += $"{info.Metadata.GUID}[{info.Metadata.Version}]{seperator}";
                 }
                 yield return null;
             }
             if (messageBuilder.Length != 0)
             {
-                logger.LogWarning(messageBuilder.ToString());
+                Logger.LogWarning(messageBuilder.ToString());
             }
             ModListString = ModListString.Remove(ModListString.Length - 3, 3); // :3
             ModListArray = ModListString.Split(seperator);
-            logger.LogWarning($"Server-sided Mod List Count: {ModListArray.Count()}");
+            Logger.LogWarning($"Server-sided Mod List Count: {ModListArray.Count()}");
             menuManager.menuNotification.SetActive(false);
             loadedMods = true;
 

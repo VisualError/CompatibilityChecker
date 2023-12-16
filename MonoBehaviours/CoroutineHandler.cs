@@ -37,7 +37,7 @@ namespace CompatibilityChecker.MonoBehaviours
             }
             else
             {
-                ModNotifyBase.logger.LogWarning($"Coroutine {coroutine.GetType().FullName} is already running");
+                ModNotifyBase.Logger.LogWarning($"Coroutine {coroutine.GetType().FullName} is already running");
             }
         }
 

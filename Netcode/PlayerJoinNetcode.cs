@@ -33,7 +33,7 @@ namespace CompatibilityChecker.Netcode
             if(GameNetworkManager.Instance.currentLobby != null)
             {
                 lobby.SetData("mods", ModNotifyBase.ModListString);
-                ModNotifyBase.logger.LogInfo($"Set {lobby.GetData("name")} mods to: {ModNotifyBase.ModListString}");
+                ModNotifyBase.Logger.LogInfo($"Set {lobby.GetData("name")} mods to: {ModNotifyBase.ModListString}");
             }
             yield break;
         }
@@ -92,29 +92,30 @@ namespace CompatibilityChecker.Netcode
             if (!mods.IsNullOrWhiteSpace())
             {
                 serverModList = mods.Split(ModNotifyBase.seperator);
-                ModNotifyBase.logger.LogWarning($"{lobby.GetData("name")} returned:");
+                ModNotifyBase.Logger.LogWarning($"{lobby.GetData("name")} returned:");
                 try
                 {
                     foreach (string mod in serverModList)
                     {
-                        string versionNumber = Regex.Match(mod, @"\[([\d.]+)\]").Success ? $"v{Regex.Match(mod, @"\[([\d.]+)\]").Value}" : "No version number found";
+                        string newModString = Regex.Replace(mod, @"\[([\d.]+)\]", "");
+                        string versionNumber = $"{Regex.Match(mod, @"\[([\d.]+)\]").Groups[1].Value}" ?? "No version number found";
                         string yourVersionNumber = "";
-                        if (Chainloader.PluginInfos.ContainsKey(mod))
+                        if (Chainloader.PluginInfos.ContainsKey(newModString))
                         {
-                            yourVersionNumber = Chainloader.PluginInfos[mod]?.Metadata?.Version?.ToString();
+                            yourVersionNumber = Chainloader.PluginInfos[newModString]?.Metadata?.Version?.ToString();
                         }
-                        string newString = mod;
-                        string incompatibilityString =  !yourVersionNumber.IsNullOrWhiteSpace() && !versionNumber.Equals(yourVersionNumber) ? $" (May be incompatible with your version v{yourVersionNumber})" : "";
-                        Package package = ThunderstoreAPI.GetPackage(mod);
+                        string newString = newModString;
+                        string incompatibilityString = !yourVersionNumber.IsNullOrWhiteSpace() && !versionNumber.IsNullOrWhiteSpace() && !VersionUtil.ConvertToNumber(versionNumber).Equals(VersionUtil.ConvertToNumber(yourVersionNumber)) ? $" (May be incompatible with your version v{yourVersionNumber})" : "";
+                        Package package = ThunderstoreAPI.GetPackage(newModString);
                         if (package != null)
                         {
-                            newString = $"{mod} {versionNumber}{incompatibilityString}";
+                            newString = $"{Regex.Replace(mod, @"\[([\d.]+)\]", "")} v{versionNumber}{incompatibilityString}";
                         }
-                        ModNotifyBase.logger.LogWarning(newString);
+                        ModNotifyBase.Logger.LogWarning(newString);
                     }
                 }catch(Exception er)
                 {
-                    ModNotifyBase.logger.LogError(er);
+                    ModNotifyBase.Logger.LogError(er);
                 }
             }
             return true;
@@ -157,7 +158,7 @@ namespace CompatibilityChecker.Netcode
             }
             __instance.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta = old;
             Package CompatibilityCheckerPackage = ThunderstoreAPI.GetPackage(PluginInfo.PLUGIN_NAME);
-            bool newVersion = CompatibilityCheckerPackage.Versions[0].VersionNumber != PluginInfo.PLUGIN_VERSION;
+            bool newVersion = VersionUtil.ConvertToNumber(CompatibilityCheckerPackage.Versions[0].VersionNumber) > VersionUtil.ConvertToNumber(PluginInfo.PLUGIN_VERSION);
             string closeString = newVersion ? $"New CompatibilityChecker update is available! v{CompatibilityCheckerPackage.Versions[0].VersionNumber} != {PluginInfo.PLUGIN_VERSION}" : "[ Close ]";
             if (newVersion & !isLoading)
             {
@@ -181,7 +182,7 @@ namespace CompatibilityChecker.Netcode
                     string list = missingMods == null || missingMods.Length == 0 ? "None..?" : string.Join("\n", missingMods);
                     string incompList = couldBeIncompatible == null || couldBeIncompatible.Length == 0 ? "None." : string.Join("\n\t\t", couldBeIncompatible);
                     __instance.DisplayMenuNotification($"Modded crew\n(Check logs/console for links)!\n Missing mods:\n{list}", closeString);
-                    ModNotifyBase.logger.LogError($"\nMissing server-sided mods from lobby \"{lobbyName}\":");
+                    ModNotifyBase.Logger.LogError($"\nMissing server-sided mods from lobby \"{lobbyName}\":");
                     foreach (string mod in missingMods)
                     {
                         string errorString = mod;
@@ -191,15 +192,15 @@ namespace CompatibilityChecker.Netcode
                             string versionNumber = Regex.Match(mod, @"\[([\d.]+)\]").Success ? $"v{Regex.Match(mod, @"\[([\d.]+)\]").Value}" : "No version number found";
                             errorString = $"\n\t--Name: {mod}\n\t--Link: {modPackage.PackageUrl}\n\t--Version: {versionNumber}\n\t--Downloads: {modPackage.Versions[0].Downloads}\n\t--Categories: [{string.Join(", ", modPackage.Categories)}]";
                         }
-                        ModNotifyBase.logger.LogError(errorString);
+                        ModNotifyBase.Logger.LogError(errorString);
                     }
-                    ModNotifyBase.logger.LogWarning($"Mods \"{lobbyName}\" may not be compatible with:\n\t\t{incompList}");
+                    ModNotifyBase.Logger.LogWarning($"Mods \"{lobbyName}\" may not be compatible with:\n\t\t{incompList}");
                     serverModList = null;
                 }
             }
             if (newVersion)
             {
-                ModNotifyBase.logger.LogWarning($"NEW VERSION OF COMPATIBILITY CHECKER IS AVAILABE. PLEASE UPDATE TO {CompatibilityCheckerPackage.Versions[0].VersionNumber}");
+                ModNotifyBase.Logger.LogWarning($"NEW VERSION OF COMPATIBILITY CHECKER IS AVAILABE. PLEASE UPDATE TO {CompatibilityCheckerPackage.Versions[0].VersionNumber}");
             }
         }
 
@@ -222,7 +223,7 @@ namespace CompatibilityChecker.Netcode
             {
                 if (currentLobby.Value.GetData("mods").IsNullOrWhiteSpace())
                 {
-                    ModNotifyBase.logger.LogInfo("Setting lobbys mods");
+                    ModNotifyBase.Logger.LogInfo("Setting lobbys mods");
                     CoroutineHandler.Instance.NewCoroutine(SetLobbyData(currentLobby.Value));
                 }
             }

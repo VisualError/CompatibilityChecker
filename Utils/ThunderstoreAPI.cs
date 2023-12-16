@@ -6,7 +6,6 @@ using System.Linq;
 using System.Net.Http;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using UnityEngine.Networking;
 
 namespace CompatibilityChecker.Utils
 {
@@ -72,7 +71,7 @@ namespace CompatibilityChecker.Utils
                 {
                     string jsonResponse = await httpClient.GetStringAsync(ApiBaseUrl);
                     packages = JsonConvert.DeserializeObject<List<Package>>(jsonResponse);
-                    ModNotifyBase.logger.LogInfo($"ThunderstoreAPI Initialized! Got packages: {packages.Count()}");
+                    ModNotifyBase.Logger.LogInfo($"ThunderstoreAPI Initialized! Got packages: {packages.Count()}");
 					foreach(Package pack in packages)
                     {
 						foreach(Version ver in pack.Versions)
@@ -84,13 +83,13 @@ namespace CompatibilityChecker.Utils
             }
             catch (Exception ex)
             {
-				ModNotifyBase.logger.LogError($"Failed to initialize Thunderstore packages. Error: {ex.Message}");
+				ModNotifyBase.Logger.LogError($"Failed to initialize Thunderstore packages. Error: {ex.Message}");
             }
 
             onComplete?.Invoke();
         }
 
-		static bool IsSimilar(string s1, string s2)
+		public static bool IsSimilar(string s1, string s2)
 		{
 			string pattern = string.Join(".*?", s2.ToCharArray());
 			Match match = Regex.Match(s1, pattern);
@@ -130,7 +129,7 @@ namespace CompatibilityChecker.Utils
 			double similarity = 1.0 - (double)distance / maxLen;
 
 			// Adjust the similarity threshold based on your needs
-			return similarity > 0.6; // You can adjust this threshold
+			return similarity > 0.54; // You can adjust this threshold
 		}
 
 		private static bool IsMatchingName(Package package, string searchString)
@@ -165,7 +164,27 @@ namespace CompatibilityChecker.Utils
 
 		public static Package GetPackage(string searchString)
 		{
-			return Packages?.FirstOrDefault(package => IsSimilar(package.Name, searchString));
+			Package value = null;
+			foreach (Package pkg in Packages)
+			{
+				if (pkg.IsDeprecated)
+				{
+					continue;
+				}
+				string noSpace = Regex.Replace(pkg.Name, @"[\s\-_]", "");
+				if (noSpace.Equals(searchString, StringComparison.OrdinalIgnoreCase) || searchString.Contains(noSpace, StringComparison.OrdinalIgnoreCase) || noSpace.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+                {
+					if(value == null)
+                    {
+						value = pkg;
+                    }
+                    if (pkg.TotalDownloads >= value?.TotalDownloads) 
+					{
+						value = pkg;
+					}
+				}
+			}
+			return value;
 		}
 
 		public static Package GetPackage(string searchString, BepInEx.PluginInfo info)

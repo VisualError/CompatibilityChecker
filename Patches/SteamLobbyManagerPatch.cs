@@ -6,12 +6,14 @@ using UnityEngine;
 using System.Linq;
 using System.Collections;
 using CompatibilityChecker.MonoBehaviours;
+using CompatibilityChecker.Utils;
+using System;
 
 namespace CompatibilityChecker.Patches
 {
     class SteamLobbyManagerPatch
     {
-        [HarmonyPatch(typeof(SteamLobbyManager), "LoadServerList")]
+        [HarmonyPatch(typeof(SteamLobbyManager), nameof(SteamLobbyManager.LoadServerList))]
         [HarmonyPostfix]
         [HarmonyAfter("me.swipez.melonloader.morecompany")]
         public static void loadserverListPatch(ref SteamLobbyManager __instance, ref Lobby[] ___currentLobbyList)
@@ -22,20 +24,39 @@ namespace CompatibilityChecker.Patches
         public static IEnumerator BetterCompatibility(SteamLobbyManager lobbyManager)
         {
             yield return new WaitUntil(() => (lobbyManager.levelListContainer.GetComponent<RectTransform>().childCount - 1 != 0) && (lobbyManager.levelListContainer.GetComponent<RectTransform>().childCount - 1) == UnityEngine.Object.FindObjectsOfType(typeof(LobbySlot)).Length && !GameNetworkManager.Instance.waitingForLobbyDataRefresh);
-            foreach (LobbySlot slot in (LobbySlot[])UnityEngine.Object.FindObjectsOfType(typeof(LobbySlot)))
+            int i = 0;
+            float lobbySlotPositionOffset = 0f;
+            try
             {
-                Lobby lobby = slot.thisLobby;
-                bool lobbyModded = !lobby.GetData("mods").IsNullOrWhiteSpace();
-                if (lobbyModded && !slot.LobbyName.text.Contains("[Checker]"))
+                foreach (LobbySlot slot in (LobbySlot[])UnityEngine.Object.FindObjectsOfType(typeof(LobbySlot)))
                 {
-                    slot.LobbyName.text = $"{slot.LobbyName.text} [Checker]";
+                    i++;
+                    Lobby lobby = slot.thisLobby;
+                    bool lobbyModded = !lobby.GetData("mods").IsNullOrWhiteSpace();
+                    if (lobbyModded && !slot.LobbyName.text.Contains("[Checker]"))
+                    {
+                        slot.LobbyName.text = $"{slot.LobbyName.text} [Checker]";
+                    }
+                    if (!ModNotifyBase.Text.IsNullOrWhiteSpace() && !slot.LobbyName.text.Contains(ModNotifyBase.Text, StringComparison.OrdinalIgnoreCase)) // TODO: Implement a better search system. Maybe.
+                    {
+                        i--;
+                        //slot.gameObject.SetActive(false);
+                        UnityEngine.Object.DestroyImmediate(slot.gameObject);
+                        continue;
+                    }
+                    slot.gameObject.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, lobbySlotPositionOffset);
+                    lobbySlotPositionOffset -= 42f;
                 }
+                RectTransform rect = lobbyManager.levelListContainer.GetComponent<RectTransform>();
+                float newWidth = rect.sizeDelta.x;
+                float newHeight = Mathf.Max(0, (i) * 42f); //rect.childCount - 1
+                rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, newWidth);
+                rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, newHeight);
             }
-            RectTransform rect = lobbyManager.levelListContainer.GetComponent<RectTransform>();
-            float newWidth = rect.sizeDelta.x;
-            float newHeight = Mathf.Max(0, (rect.childCount - 1) * 42f);
-            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Horizontal, newWidth);
-            rect.SetSizeWithCurrentAnchors(RectTransform.Axis.Vertical, newHeight);
+            catch(Exception err)
+            {
+                ModNotifyBase.Logger.LogError(err);
+            }
             yield break;
         }
 
@@ -103,7 +124,7 @@ namespace CompatibilityChecker.Patches
                             }
                         }
                     }
-                    GameObject gameObject = Object.Instantiate(__instance.LobbySlotPrefab, __instance.levelListContainer);
+                    GameObject gameObject = UnityEngine.Object.Instantiate(__instance.LobbySlotPrefab, __instance.levelListContainer);
                     gameObject.GetComponent<RectTransform>().anchoredPosition = new Vector2(0f, ___lobbySlotPositionOffset);
                     ___lobbySlotPositionOffset -= 42f;
                     LobbySlot componentInChildren = gameObject.GetComponentInChildren<LobbySlot>();

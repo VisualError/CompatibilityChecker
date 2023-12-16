@@ -13,7 +13,7 @@ namespace CompatibilityChecker.Utils
             }
             else
             {
-                ModNotifyBase.logger.LogWarning($"Error parsing version: {version}");
+                ModNotifyBase.Logger.LogError($"Error parsing version: {version}");
                 return 0;
             }
         }
