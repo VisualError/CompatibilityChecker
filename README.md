@@ -77,3 +77,6 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 - **Fixed**: Possible incompatible mods information should now show up in your mod logs.
 - **Added**: Lobby search functionality! YIPPIE!!!
 - **Next patch**: Join via lobby code.
+
+# Version 1.1.5
+- **Added**: Copy server ID, ability to join with server id.

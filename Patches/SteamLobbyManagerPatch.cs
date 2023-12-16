@@ -8,6 +8,8 @@ using System.Collections;
 using CompatibilityChecker.MonoBehaviours;
 using CompatibilityChecker.Utils;
 using System;
+using UnityEngine.UI;
+using TMPro;
 
 namespace CompatibilityChecker.Patches
 {
@@ -31,6 +33,29 @@ namespace CompatibilityChecker.Patches
                 foreach (LobbySlot slot in (LobbySlot[])UnityEngine.Object.FindObjectsOfType(typeof(LobbySlot)))
                 {
                     i++;
+                    GameObject JoinButton = slot.transform.Find("JoinButton")?.gameObject;
+                    if (JoinButton != null)
+                    {
+                        GameObject CopyCodeButton = UnityEngine.Object.Instantiate(JoinButton, JoinButton.transform.parent);
+                        CopyCodeButton.SetActive(true);
+                        RectTransform rectTransform = CopyCodeButton.GetComponent<RectTransform>();
+                        if (rectTransform != null)
+                        {
+                            rectTransform.anchoredPosition -= new Vector2(78f, 0f);
+                            CopyCodeButton.GetComponentInChildren<TextMeshProUGUI>().text = "Code";
+                            Button ButtonComponent = CopyCodeButton.GetComponent<Button>();
+                            if (ButtonComponent != null)
+                            {
+                                ButtonComponent.onClick = new Button.ButtonClickedEvent();
+                                ButtonComponent.onClick.AddListener(() =>
+                                {
+                                    string lobbyCode = slot.lobbyId.ToString();
+                                    GUIUtility.systemCopyBuffer = lobbyCode;
+                                    ModNotifyBase.Logger.LogInfo("Lobby code copied to clipboard: " + lobbyCode);
+                                });
+                            }
+                        }
+                    }
                     Lobby lobby = slot.thisLobby;
                     bool lobbyModded = !lobby.GetData("mods").IsNullOrWhiteSpace();
                     if (lobbyModded && !slot.LobbyName.text.Contains("[Checker]"))

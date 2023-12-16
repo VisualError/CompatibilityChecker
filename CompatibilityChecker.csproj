@@ -4,7 +4,7 @@
     <TargetFramework>netstandard2.1</TargetFramework>
     <AssemblyName>Ryokune.CompatibilityChecker</AssemblyName>
     <Description>Lethal Company Library that lets you know which mods a modded server has.</Description>
-    <Version>1.1.4</Version>
+    <Version>1.1.5</Version>
     <AllowUnsafeBlocks>false</AllowUnsafeBlocks>
     <LangVersion>latest</LangVersion>
     <PackageId>Ryokune.CompatibilityChecker</PackageId>

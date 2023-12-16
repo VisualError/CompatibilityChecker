@@ -17,6 +17,10 @@ using System.Collections;
 using CompatibilityChecker.Utils;
 using CompatibilityChecker.MonoBehaviours;
 using UnityEngine.SceneManagement;
+using Steamworks.Data;
+using Steamworks;
+using UnityEngine.UI;
+using TMPro;
 
 namespace CompatibilityChecker
 {
@@ -34,13 +38,60 @@ namespace CompatibilityChecker
         public static string seperator = "/@/";
         public static SearchBox ServerSearchBox;
         public static string Text;
+
+        private static IEnumerator JoinLobby(SteamId lobbyId)
+        {
+            Logger.LogWarning("1");
+            Task<Lobby?> joinTask = SteamMatchmaking.JoinLobbyAsync(lobbyId);
+            yield return new WaitUntil(() => joinTask.IsCompleted);
+            if (joinTask.Result.HasValue)
+            {
+                Logger.LogWarning("2");
+                Lobby lobby = joinTask.Result.Value;
+                LobbySlot.JoinLobbyAfterVerifying(lobby, lobby.Id);
+                Logger.LogWarning("3");
+            }
+            else
+            {
+                Logger.LogWarning("Failed to join lobby.");
+            }
+        }
         private static void OnEndEdit(string newValue)
         {
             // Handle the search value change here
             Text = newValue;
             SteamLobbyManager lobbyManager = FindObjectOfType<SteamLobbyManager>();
+            if (ulong.TryParse(newValue, out ulong result))
+            {
+                GameObject searchBoxObject = GameObject.Find("/Canvas/MenuContainer/LobbyList/JoinCode(Copy)");
+                if (searchBoxObject != null)
+                {
+                    TMP_InputField inputField = searchBoxObject.GetComponent<TMP_InputField>();
+                    if (inputField != null)
+                    {
+                        inputField.text = "";
+                    }
+                }
+                SteamId id = new SteamId();
+                id.Value = result;
+                CoroutineHandler.Instance.NewCoroutine(JoinLobby(result));
+                return;
+            }
             lobbyManager.LoadServerList();
         }
+
+        private static IEnumerator displayCopied(TextMeshProUGUI textMesh)
+        {
+            string oldtext = textMesh.text;
+            string id = GameNetworkManager.Instance.currentLobby.Value.Id.ToString();
+            textMesh.text = "(Copied to clipboard!)";
+            GUIUtility.systemCopyBuffer = id;
+            Logger.LogWarning("Lobby code copied to clipboard: " + id);
+            yield return new WaitForSeconds(1.2f);
+            textMesh.text = oldtext;
+            yield break;
+        }
+
         static void sceneLoad(Scene sceneName, LoadSceneMode load)
         {
             if (sceneName.name == "MainMenu")
@@ -54,18 +105,34 @@ namespace CompatibilityChecker
                     {
                         GameObject searchBoxObject = Instantiate(obj.gameObject, obj.transform.parent);
                         searchBoxObject.SetActive(true);
-                        TMPro.TMP_InputField inputField = searchBoxObject.GetComponent<TMPro.TMP_InputField>();
-                        if(inputField != null)
-                        {
-                            inputField.interactable = true;
-                            inputField.placeholder.gameObject.GetComponent<TMPro.TextMeshProUGUI>().text = "Search or Enter a room code...";
-                            inputField.onSubmit = new TMPro.TMP_InputField.SubmitEvent();
-                            inputField.onSubmit.AddListener(OnEndEdit);
-                        }
-                    }catch(Exception err)
+                        TMP_InputField inputField = searchBoxObject.GetComponent<TMP_InputField>();
+                        inputField.interactable = true;
+                        inputField.placeholder.gameObject.GetComponent<TMPro.TextMeshProUGUI>().text = "Search or Enter a room code...";
+                        inputField!.onEndEdit = new TMP_InputField.SubmitEvent();
+                        inputField!.onEndTextSelection = new TMP_InputField.TextSelectionEvent();
+                        inputField!.onSubmit = new TMP_InputField.SubmitEvent();
+                        inputField!.onSubmit.AddListener(OnEndEdit);
+                    }
+                    catch(Exception err)
                     {
                         Logger.LogError(err);
                     }
+                }
+            }else if(sceneName.name == "SampleSceneRelay")
+            {
+                GameObject ResumeObj = GameObject.Find("/Systems/UI/Canvas/QuickMenu/MainButtons/Resume");
+                if (ResumeObj != null)
+                {
+                    GameObject LobbyCodeObj = Instantiate(ResumeObj.gameObject, ResumeObj.transform.parent);
+                    LobbyCodeObj.GetComponent<RectTransform>().anchoredPosition += new Vector2(0f, 182f);
+                    TextMeshProUGUI LobbyCodeTextMesh = LobbyCodeObj.GetComponentInChildren<TextMeshProUGUI>();
+                    LobbyCodeTextMesh.text = "> Lobby Code";
+                    Button LobbyCodeButton = LobbyCodeObj.GetComponent<Button>();
+                    LobbyCodeButton!.onClick = new Button.ButtonClickedEvent();
+                    LobbyCodeButton!.onClick.AddListener(() =>
+                    {
+                        CoroutineHandler.Instance.NewCoroutine(displayCopied(LobbyCodeTextMesh));
+                    });
                 }
             }
         }
