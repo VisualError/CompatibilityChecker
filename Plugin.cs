@@ -7,12 +7,10 @@ using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
 using System.Threading.Tasks;
-using System.Reflection;
 using CompatibilityChecker.Patches;
 using System.Text.RegularExpressions;
 using System.Text;
 using System;
-using System.Globalization;
 using System.Collections;
 using CompatibilityChecker.Utils;
 using CompatibilityChecker.MonoBehaviours;
@@ -36,24 +34,38 @@ namespace CompatibilityChecker
         public static string[] ModListArray;
         public static bool loadedMods;
         public static string seperator = "/@/";
-        public static SearchBox ServerSearchBox;
+        //public static SearchBox ServerSearchBox;
         public static string Text;
+        public static TMP_InputField searchInputField;
 
-        private static IEnumerator JoinLobby(SteamId lobbyId)
+        private static IEnumerator JoinLobby(SteamId lobbyId, SteamLobbyManager lobbyManager)
         {
-            Logger.LogWarning("1");
+            bool found = false;
+            Logger.LogWarning("Getting Lobby");
             Task<Lobby?> joinTask = SteamMatchmaking.JoinLobbyAsync(lobbyId);
             yield return new WaitUntil(() => joinTask.IsCompleted);
             if (joinTask.Result.HasValue)
             {
-                Logger.LogWarning("2");
+                Logger.LogWarning("Getting Lobby Value");
                 Lobby lobby = joinTask.Result.Value;
-                LobbySlot.JoinLobbyAfterVerifying(lobby, lobby.Id);
-                Logger.LogWarning("3");
+                if (!lobby.GetData("vers").IsNullOrWhiteSpace())
+                {
+                    LobbySlot.JoinLobbyAfterVerifying(lobby, lobby.Id);
+                    found = true;
+                    Logger.LogWarning("Success!");
+                }
             }
             else
             {
                 Logger.LogWarning("Failed to join lobby.");
+            }
+            if (!found)
+            {
+                lobbyManager.LoadServerList();
+            }else if (searchInputField != null)
+            {
+                searchInputField.text = "";
+                Text = "";
             }
         }
         private static void OnEndEdit(string newValue)
@@ -63,18 +75,9 @@ namespace CompatibilityChecker
             SteamLobbyManager lobbyManager = FindObjectOfType<SteamLobbyManager>();
             if (ulong.TryParse(newValue, out ulong result))
             {
-                GameObject searchBoxObject = GameObject.Find("/Canvas/MenuContainer/LobbyList/JoinCode(Copy)");
-                if (searchBoxObject != null)
-                {
-                    TMP_InputField inputField = searchBoxObject.GetComponent<TMP_InputField>();
-                    if (inputField != null)
-                    {
-                        inputField.text = "";
-                    }
-                }
                 SteamId id = new SteamId();
                 id.Value = result;
-                CoroutineHandler.Instance.NewCoroutine(JoinLobby(result));
+                CoroutineHandler.Instance.NewCoroutine(JoinLobby(result, lobbyManager));
                 return;
             }
             lobbyManager.LoadServerList();
@@ -83,10 +86,17 @@ namespace CompatibilityChecker
         private static IEnumerator displayCopied(TextMeshProUGUI textMesh)
         {
             string oldtext = textMesh.text;
-            string id = GameNetworkManager.Instance.currentLobby.Value.Id.ToString();
-            textMesh.text = "(Copied to clipboard!)";
-            GUIUtility.systemCopyBuffer = id;
-            Logger.LogWarning("Lobby code copied to clipboard: " + id);
+            if (GameNetworkManager.Instance.currentLobby.HasValue)
+            {
+                textMesh.text = "(Copied to clipboard!)";
+                string id = GameNetworkManager.Instance.currentLobby.Value.Id.ToString();
+                GUIUtility.systemCopyBuffer = id;
+                Logger.LogWarning("Lobby code copied to clipboard: " + id);
+            }
+            else
+            {
+                textMesh.text = "Can't get Lobby code!";
+            }
             yield return new WaitForSeconds(1.2f);
             textMesh.text = oldtext;
             yield break;
@@ -105,13 +115,13 @@ namespace CompatibilityChecker
                     {
                         GameObject searchBoxObject = Instantiate(obj.gameObject, obj.transform.parent);
                         searchBoxObject.SetActive(true);
-                        TMP_InputField inputField = searchBoxObject.GetComponent<TMP_InputField>();
-                        inputField.interactable = true;
-                        inputField.placeholder.gameObject.GetComponent<TMPro.TextMeshProUGUI>().text = "Search or Enter a room code...";
-                        inputField!.onEndEdit = new TMP_InputField.SubmitEvent();
-                        inputField!.onEndTextSelection = new TMP_InputField.TextSelectionEvent();
-                        inputField!.onSubmit = new TMP_InputField.SubmitEvent();
-                        inputField!.onSubmit.AddListener(OnEndEdit);
+                        searchInputField = searchBoxObject.GetComponent<TMP_InputField>();
+                        searchInputField.interactable = true;
+                        searchInputField.placeholder.gameObject.GetComponent<TextMeshProUGUI>().text = "Search or Enter a room code...";
+                        searchInputField!.onEndEdit = new TMP_InputField.SubmitEvent();
+                        searchInputField!.onEndTextSelection = new TMP_InputField.TextSelectionEvent();
+                        searchInputField!.onSubmit = new TMP_InputField.SubmitEvent();
+                        searchInputField!.onSubmit.AddListener(OnEndEdit);
                     }
                     catch(Exception err)
                     {

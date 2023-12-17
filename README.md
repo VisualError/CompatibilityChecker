@@ -80,3 +80,6 @@ Enjoy a more informed multiplayer experience with CompatibilityChecker!
 
 # Version 1.1.5
 - **Added**: Copy server ID, ability to join with server id.
+
+# Version 1.1.6
+- **Fixed**: Server search breaking if you put in an invalid lobby code.
