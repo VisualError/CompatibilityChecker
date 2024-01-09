@@ -8,7 +8,6 @@ using System.Linq;
 using UnityEngine;
 using System.Threading.Tasks;
 using CompatibilityChecker.Patches;
-using System.Text.RegularExpressions;
 using System.Text;
 using System;
 using System.Collections;
@@ -18,27 +17,70 @@ using UnityEngine.SceneManagement;
 using Steamworks.Data;
 using Steamworks;
 using UnityEngine.UI;
+using BepInEx.Configuration;
 using TMPro;
 
 namespace CompatibilityChecker
 {
-    [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)]
+    [BepInPlugin(PluginInfo.PLUGIN_GUID, PluginInfo.PLUGIN_NAME, PluginInfo.PLUGIN_VERSION)] // TODO: REFACTOR.
     [BepInProcess("Lethal Company.exe")]
     public class ModNotifyBase : BaseUnityPlugin
     {
+        // Configs
+        public static ConfigEntry<int> ThunderstoreTimeout;
+        public static ConfigEntry<int> ThunderstoreRetries;
+
+
         public static ModNotifyBase instance;
         public static new ManualLogSource Logger;
         private readonly Harmony harmony = new Harmony(PluginInfo.PLUGIN_GUID);
         public static Dictionary<string, BepInEx.PluginInfo> ModList = new Dictionary<string, BepInEx.PluginInfo>();
         public static string ModListString;
-        public static string[] ModListArray;
+        public static string ModListStringOld;
+        public static Dictionary<string, string> ModListArray = new Dictionary<string, string>();
         public static bool loadedMods;
         public static string seperator = "/@/";
         //public static SearchBox ServerSearchBox;
         public static string Text;
         public static TMP_InputField searchInputField;
 
-        private static IEnumerator JoinLobby(SteamId lobbyId, SteamLobbyManager lobbyManager)
+        private void Awake()
+        {
+            // Set configs.
+            ThunderstoreTimeout = Config.Bind("Thunderstore API", "Timeout", 300, "How long it'll take before the API times out in seconds.");
+            ThunderstoreRetries = Config.Bind("Thunderstore API", "Retries", 10, "How many retries to access API before failing.");
+
+
+            // Set instance.
+            if (instance == null)
+            {
+                instance = this;
+                Logger = base.Logger;
+            }
+            // Load Thunderstore API.
+            CoroutineHandler.Instance.NewCoroutine(ThunderstoreAPI.Initialize());
+
+            // Debugging purposes
+            Application.logMessageReceived += (string log, string trace, LogType type) =>
+            {
+                if (type == LogType.Error)
+                {
+                    Logger.Log(LogLevel.All, $"[Unity Error Debugging] {log}\n{trace}");
+                }
+            };
+
+            // TODO: Use harmony for this
+            SceneManager.sceneLoaded += sceneLoad;
+
+            // Plugin startup logic.
+            Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
+            Logger.LogInfo("Modded servers with CompatibilityChecker will now notify you what mods are needed.");
+            harmony.PatchAll(typeof(ModNotifyBase));
+            harmony.PatchAll(typeof(PlayerJoinNetcode));
+            harmony.PatchAll(typeof(SteamLobbyManagerPatch));
+        }
+
+        private static IEnumerator JoinLobby(ulong lobbyId, SteamLobbyManager lobbyManager)
         {
             bool found = false;
             Logger.LogWarning("Getting Lobby");
@@ -75,8 +117,6 @@ namespace CompatibilityChecker
             SteamLobbyManager lobbyManager = FindObjectOfType<SteamLobbyManager>();
             if (ulong.TryParse(newValue, out ulong result))
             {
-                SteamId id = new SteamId();
-                id.Value = result;
                 CoroutineHandler.Instance.NewCoroutine(JoinLobby(result, lobbyManager));
                 return;
             }
@@ -102,6 +142,7 @@ namespace CompatibilityChecker
             yield break;
         }
 
+        // TODO: Use harmony for this.
         static void sceneLoad(Scene sceneName, LoadSceneMode load)
         {
             if (sceneName.name == "MainMenu")
@@ -147,44 +188,43 @@ namespace CompatibilityChecker
             }
         }
 
-        private void Awake()
-        {
-            SceneManager.sceneLoaded += sceneLoad;
-            if (instance == null)
-            {
-                instance = this;
-                Logger = base.Logger;
-            }
-            CoroutineHandler.Instance.NewCoroutine(ThunderstoreAPI.Initialize());
-            // Plugin startup logic
-            Logger.LogInfo($"Plugin {PluginInfo.PLUGIN_GUID} is loaded!");
-            Logger.LogInfo("Modded servers with CompatibilityChecker will now notify you what mods are needed.");
-            harmony.PatchAll(typeof(ModNotifyBase));
-            harmony.PatchAll(typeof(PlayerJoinNetcode));
-            harmony.PatchAll(typeof(SteamLobbyManagerPatch));
-        }
 
+        // TODO: what the hell is this
         public static IEnumerator InitializeModsCoroutine()
         {
-            yield return new WaitUntil(() => ThunderstoreAPI.Packages != null);
-            ModList = Chainloader.PluginInfos;
-            StringBuilder messageBuilder = new StringBuilder();
             MenuManager menuManager = FindObjectOfType<MenuManager>();
             PlayerJoinNetcode.old = menuManager.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta != Vector2.zero ? menuManager.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta : PlayerJoinNetcode.old;
-            int i = 0;
-            int count = ModList.Count();
+            menuManager.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta = Vector2.zero;
+            menuManager.menuNotificationText.text = $"Waiting for Thunderstore list to be initialized.";
+            menuManager.menuNotificationButtonText.text = null;
             menuManager.menuNotification.SetActive(true);
+            if (ThunderstoreAPI.Failed)
+            {
+                CoroutineHandler.Instance.NewCoroutine(ThunderstoreAPI.Initialize());
+            }
+            yield return new WaitUntil(() => ThunderstoreAPI.Packages != null || ThunderstoreAPI.Failed);
+            if (ThunderstoreAPI.Failed)
+            {
+                menuManager.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta = PlayerJoinNetcode.old;
+                menuManager.DisplayMenuNotification("Failed to initialize Thunderstore list. Check your internet connection or change the Configs!", "[ Back ]");
+                CoroutineHandler.Instance.StopAllCoroutines();
+                yield break;
+            }
+            ModList = Chainloader.PluginInfos;
+            StringBuilder messageBuilder = new StringBuilder();
+            int i = 0;
+            int count = Chainloader.PluginInfos.Count;
+            string warning = "";
             foreach (BepInEx.PluginInfo info in ModList.Values)
             {
                 i++;
                 menuManager.menuNotificationText.text = $"Loading mods {i}/{count}";
                 menuManager.menuNotificationButtonText.text = null;
                 menuManager.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta = Vector2.zero;
-                string noSpace = Regex.Replace(info.Metadata.Name, @"[\s\-_]", "");
-                Package package = ThunderstoreAPI.GetPackage(noSpace, info);
+                Package package = ThunderstoreAPI.GetPackage(info.Metadata.Name, info);
                 if (package != null)
                 {
-                    Logger.LogInfo($"[{info.Metadata.GUID}] Found package: {info.Metadata.Name}[{info.Metadata.Version}]\n\t\tDATA:\n\t\t--NAME: {package.FullName}\n\t\t--LINK: {package.PackageUrl}");
+                    Logger.LogInfo($"[{info.Metadata.GUID}] Found package ({i}/{count}): {info.Metadata.Name}[{info.Metadata.Version}]\n\t\tDATA:\n\t\t--NAME: {package.FullName}\n\t\t--LINK: {package.PackageUrl}");
                     if (VersionUtil.ConvertToNumber(package.Versions[0].VersionNumber) > VersionUtil.ConvertToNumber(info.Metadata.Version.ToString()))
                     {
                         messageBuilder.AppendLine($"\n\t\t--Mod {info.Metadata.Name} [{info.Metadata.GUID}] v{info.Metadata.Version} does not equal the latest release!");
@@ -193,21 +233,19 @@ namespace CompatibilityChecker
                         messageBuilder.AppendLine($"\t\t--Full mod name: {package.FullName}");
                         messageBuilder.AppendLine($"\t\t--(If this is wrong, please ignore this.)");
                     }
+                    ModListString += $"{package.ShorterId}[{info.Metadata.Version}]";
                 }
-                if (package != null && package.Categories.Contains("Server-side"))
+                if (package != null && package.Categories.Contains("Server-side", StringComparer.OrdinalIgnoreCase))
                 {
                     if (package.Name == PluginInfo.PLUGIN_NAME && package.Versions[0].VersionNumber != PluginInfo.PLUGIN_VERSION)
                     {
-                        string warning = $"Current {PluginInfo.PLUGIN_NAME} v{PluginInfo.PLUGIN_VERSION} does not equal latest release v{package.Versions[0].VersionNumber}!\nPlease update to the latest version of {PluginInfo.PLUGIN_NAME}!!!";
-                        Logger.LogWarning(warning);
-                        FindObjectOfType<MenuManager>().DisplayMenuNotification(warning, null);
+                        warning = $"Current {PluginInfo.PLUGIN_NAME} v{PluginInfo.PLUGIN_VERSION} does not equal latest release v{package.Versions[0].VersionNumber}!\nPlease update to the latest version of {PluginInfo.PLUGIN_NAME}!!!";
                     }
-                    ModListString += $"{info.Metadata.Name}[{info.Metadata.Version}]{seperator}";
+                    ModListStringOld += $"{info.Metadata.Name}[{info.Metadata.Version}]";
                 }
                 else if (package == null)
                 {
                     Logger.LogWarning($"Couldn't find package: {info.Metadata.Name}[{info.Metadata.Version}]\n\t\t[{info.Metadata.GUID}]");
-                    ModListString += $"{info.Metadata.GUID}[{info.Metadata.Version}]{seperator}";
                 }
                 yield return null;
             }
@@ -215,12 +253,17 @@ namespace CompatibilityChecker
             {
                 Logger.LogWarning(messageBuilder.ToString());
             }
-            ModListString = ModListString.Remove(ModListString.Length - 3, 3); // :3
-            ModListArray = ModListString.Split(seperator);
-            Logger.LogWarning($"Server-sided Mod List Count: {ModListArray.Count()}");
+            if (!warning.IsNullOrWhiteSpace())
+            {
+                Logger.LogWarning(warning);
+                FindObjectOfType<MenuManager>().DisplayMenuNotification(warning, null);
+            }
+            ModListArray = StringCompressionUtil.SetListTo(ModListArray, ModListStringOld);
+            ModListString = StringCompressionUtil.Compress(ModListString);
+            Logger.LogWarning($"Server-sided Mod List Count: {ModListArray.Count}");
             menuManager.menuNotification.SetActive(false);
             loadedMods = true;
-
+            //GUIUtility.systemCopyBuffer = string.Join(",", Chainloader.PluginInfos.Keys);
             yield break;
         }
     }

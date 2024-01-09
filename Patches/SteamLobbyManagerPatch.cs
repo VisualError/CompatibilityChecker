@@ -6,15 +6,33 @@ using UnityEngine;
 using System.Linq;
 using System.Collections;
 using CompatibilityChecker.MonoBehaviours;
-using CompatibilityChecker.Utils;
 using System;
 using UnityEngine.UI;
 using TMPro;
+using CompatibilityChecker.Utils;
 
 namespace CompatibilityChecker.Patches
 {
     class SteamLobbyManagerPatch
     {
+
+        [HarmonyPatch(typeof(LobbySlot), nameof(LobbySlot.JoinLobbyAfterVerifying))]
+        [HarmonyPrefix]
+        public static bool JoinLobbyAfterVerifyingPrefix(Lobby lobby)
+        {
+            if (!ModNotifyBase.loadedMods)
+            {
+                ModNotifyBase.Logger.LogInfo("Loading first");
+                CoroutineHandler.Instance.NewCoroutine(FunnyJoinUtil.JoinLobbyAfterVerifying(lobby));
+                CoroutineHandler.Instance.NewCoroutine(ModNotifyBase.InitializeModsCoroutine());
+                return false;
+            }
+            else
+            {
+                return true;
+            }
+        }
+
         [HarmonyPatch(typeof(SteamLobbyManager), nameof(SteamLobbyManager.LoadServerList))]
         [HarmonyPostfix]
         [HarmonyAfter("me.swipez.melonloader.morecompany")]
@@ -58,7 +76,7 @@ namespace CompatibilityChecker.Patches
                     }
                     Lobby lobby = slot.thisLobby;
                     bool lobbyModded = !lobby.GetData("mods").IsNullOrWhiteSpace();
-                    if (lobbyModded && !slot.LobbyName.text.Contains("[Checker]"))
+                    if (lobbyModded && !slot.LobbyName.text.Contains("[Checker]", StringComparison.OrdinalIgnoreCase))
                     {
                         slot.LobbyName.text = $"{slot.LobbyName.text} [Checker]";
                     }
@@ -138,12 +156,11 @@ namespace CompatibilityChecker.Patches
                 bool lobbyModded = !currentLobby.GetData("mods").IsNullOrWhiteSpace();
                 if (!lobbyName.IsNullOrWhiteSpace())
                 {
-                    string lobbyNameLowercase = lobbyName.ToLower();
                     if (__instance.censorOffensiveLobbyNames)
                     {
                         foreach (string word in offensiveWords)
                         {
-                            if (lobbyNameLowercase.Contains(word))
+                            if (lobbyName.Contains(word, StringComparison.OrdinalIgnoreCase))
                             {
                                 continue;
                             }

@@ -1,17 +1,11 @@
 ﻿using BepInEx;
-using BepInEx.Bootstrap;
 using CompatibilityChecker.MonoBehaviours;
 using CompatibilityChecker.Utils;
 using HarmonyLib;
 using Steamworks;
 using Steamworks.Data;
-using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
-using System.Text.RegularExpressions;
-using Unity.Netcode;
 using UnityEngine;
 
 namespace CompatibilityChecker.Netcode
@@ -19,43 +13,15 @@ namespace CompatibilityChecker.Netcode
     [HarmonyPatch]
     class PlayerJoinNetcode
     {
-        static string[] serverModList = null;
+        static Dictionary<string, string> serverModList = new Dictionary<string, string>();
         public static Vector2 old = Vector2.zero;
-
-        public static IEnumerator SetLobbyData(Lobby lobby)
-        {
-            /*yield return new WaitUntil(() => ModNotifyBase.thunderStoreList != null);
-            if(ModNotifyBase.ModList.Count() == 0)
-            {
-                ModNotifyBase.InitializeModList();
-            }
-            yield return new WaitUntil(() => ModNotifyBase.ModList.Count() == Chainloader.PluginInfos.Count() );*/
-            if(GameNetworkManager.Instance.currentLobby != null)
-            {
-                lobby.SetData("mods", ModNotifyBase.ModListString);
-                ModNotifyBase.Logger.LogInfo($"Set {lobby.GetData("name")} mods to: {ModNotifyBase.ModListString}");
-            }
-            yield break;
-        }
-
-        /*public static IEnumerator LoadMods()
-        {
-            yield return new WaitUntil(() => ModNotifyBase.thunderStoreList != null);
-            if (ModNotifyBase.ModList.Count() == 0)
-            {
-                ModNotifyBase.InitializeModList();
-            }
-            yield return new WaitUntil(() => ModNotifyBase.ModList.Count() == Chainloader.PluginInfos.Count());
-            yield break;
-        }*/
-
         [HarmonyPatch(typeof(GameNetworkManager), "SteamMatchmaking_OnLobbyCreated")]
         [HarmonyPrefix]
         public static bool OnLobbyCreated(ref GameNetworkManager __instance, Result result, ref Lobby lobby)
         {
             if(result == Result.OK)
             {
-                CoroutineHandler.Instance.NewCoroutine(SetLobbyData(lobby));
+                CoroutineHandler.Instance.NewCoroutine(ModDataUtil.SetLobbyData(lobby));
             }
             return true;
         }
@@ -67,86 +33,33 @@ namespace CompatibilityChecker.Netcode
         {
             if (!ModNotifyBase.loadedMods)
             {
-                CoroutineHandler.Instance.NewCoroutine(Connect());
+                CoroutineHandler.Instance.NewCoroutine(FunnyJoinUtil.StartHost());
                 CoroutineHandler.Instance.NewCoroutine(ModNotifyBase.InitializeModsCoroutine());
                 return false;
             }
-            else
-            {
-                return true;
-            }
-        }
-
-        public static IEnumerator Connect()
-        {
-            yield return new WaitUntil(() => ModNotifyBase.loadedMods);
-            GameNetworkManager.Instance.StartHost();
-            yield break;
+            return true;
         }
 
         [HarmonyPatch(typeof(GameNetworkManager), "LobbyDataIsJoinable")]
         [HarmonyPrefix]
         public static bool IsJoinable(ref Lobby lobby)
         {
-            string mods = lobby.GetData("mods");
-            if (!mods.IsNullOrWhiteSpace())
-            {
-                serverModList = mods.Split(ModNotifyBase.seperator);
-                ModNotifyBase.Logger.LogWarning($"{lobby.GetData("name")} returned:");
-                try
-                {
-                    foreach (string mod in serverModList)
-                    {
-                        string newModString = Regex.Replace(mod, @"\[([\d.]+)\]", "");
-                        string versionNumber = $"{Regex.Match(mod, @"\[([\d.]+)\]").Groups[1].Value}" ?? "No version number found";
-                        string yourVersionNumber = "";
-                        if (Chainloader.PluginInfos.ContainsKey(newModString))
-                        {
-                            yourVersionNumber = Chainloader.PluginInfos[newModString]?.Metadata?.Version?.ToString();
-                        }
-                        string newString = newModString;
-                        string incompatibilityString = !yourVersionNumber.IsNullOrWhiteSpace() && !versionNumber.IsNullOrWhiteSpace() && !VersionUtil.ConvertToNumber(versionNumber).Equals(VersionUtil.ConvertToNumber(yourVersionNumber)) ? $" (May be incompatible with your version v{yourVersionNumber})" : "";
-                        Package package = ThunderstoreAPI.GetPackage(newModString);
-                        if (package != null)
-                        {
-                            newString = $"{Regex.Replace(mod, @"\[([\d.]+)\]", "")} v{versionNumber}{incompatibilityString}";
-                        }
-                        ModNotifyBase.Logger.LogWarning(newString);
-                    }
-                }catch(Exception er)
-                {
-                    ModNotifyBase.Logger.LogError(er);
-                }
-            }
+            serverModList.Clear(); // Clear before joining any server.
+
+            string oldModData = lobby.GetData("mods"); // this is for old ver compatibility.
+            string mods = lobby.GetData("RyokuneCompatibilityChecker");
+            serverModList = ModDataUtil.ProcessModData(oldModData, mods, lobby, serverModList);
             return true;
         }
 
-        [HarmonyPatch(typeof(GameNetworkManager), "ConnectionApproval")]
-        [HarmonyPostfix]
-        public static void JoinLobbyPostfix()
-        {
-            if(ModNotifyBase.ModList.Count == 0)
-            {
-                CoroutineHandler.Instance.NewCoroutine(ModNotifyBase.InitializeModsCoroutine());
-            }
-        }
-
-        /*[HarmonyPatch(typeof(MenuManager), nameof(MenuManager.SetLoadingScreen))]
-        [HarmonyPrefix]
-        public static bool LoadingScreenPrefix(ref MenuManager __instance, ref RoomEnter result)
-        {
-            if (old == Vector2.zero)
-            {
-                old = __instance.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta;
-            }
-            __instance.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta = old;
-            return true;
-        }*/
-
-        [HarmonyPatch(typeof(MenuManager), nameof(MenuManager.SetLoadingScreen))]
+        [HarmonyPatch(typeof(MenuManager), nameof(MenuManager.SetLoadingScreen))] // TODO: REFACTOR.
         [HarmonyPostfix]
         public static void SetLoadingScreenPatch(ref MenuManager __instance, ref RoomEnter result, ref bool isLoading, ref string overrideMessage)
         {
+            if (!ModNotifyBase.loadedMods)
+            {
+                return;
+            }
             if (old == Vector2.zero)
             {
                 old = __instance.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta;
@@ -154,6 +67,7 @@ namespace CompatibilityChecker.Netcode
             if (result != RoomEnter.Error || !overrideMessage.IsNullOrWhiteSpace())
             {
                 __instance.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta = old;
+                serverModList.Clear(); // Clear if the error is defined.
                 return;
             }
             __instance.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta = old;
@@ -164,38 +78,24 @@ namespace CompatibilityChecker.Netcode
             {
                 __instance.menuNotificationButtonText.transform.parent.GetComponent<RectTransform>().sizeDelta = new Vector2(256.375f, 58.244f);
             }
-            if (ModNotifyBase.ModList.Count == 0)
-            {
-                CoroutineHandler.Instance.NewCoroutine(ModNotifyBase.InitializeModsCoroutine());
-            }
             if (overrideMessage.IsNullOrWhiteSpace() && GameNetworkManager.Instance.disconnectionReasonMessage.IsNullOrWhiteSpace() && !isLoading)
             {
-                if (serverModList == null)
+                if (serverModList.Count == 0)
                 {
-                    __instance.DisplayMenuNotification($"Failed to join Modded Crew!\n Missing mods:\nCan't display: Host does not have CompatibilityChecker!", closeString);
+                    __instance.DisplayMenuNotification($"Failed to join crew!\n Missing mods:\nCan't display!", closeString);
                 }
                 else
                 {
                     string lobbyName = GameNetworkManager.Instance?.currentLobby.Value.GetData("name");
-                    string[] missingMods = serverModList.Except(ModNotifyBase.ModListArray).ToArray();
-                    string[] couldBeIncompatible = ModNotifyBase.ModListArray.Except(serverModList).ToArray();
-                    string list = missingMods == null || missingMods.Length == 0 ? "None..?" : string.Join("\n", missingMods);
-                    string incompList = couldBeIncompatible == null || couldBeIncompatible.Length == 0 ? "None." : string.Join("\n\t\t", couldBeIncompatible);
+                    var missingMods = serverModList.Except(ModNotifyBase.ModListArray).ToList();
+                    var couldBeIncompatible = ModNotifyBase.ModListArray.Except(serverModList).ToList();
+                    string list = missingMods == null || missingMods.Count == 0 ? "None..?" : string.Join("\n", missingMods);
+                    string incompList = couldBeIncompatible == null || couldBeIncompatible.Count == 0 ? "None." : string.Join("\n\t\t", couldBeIncompatible);
                     __instance.DisplayMenuNotification($"Modded crew\n(Check logs/console for links)!\n Missing mods:\n{list}", closeString);
-                    ModNotifyBase.Logger.LogError($"\nMissing server-sided mods from lobby \"{lobbyName}\":");
-                    foreach (string mod in missingMods)
-                    {
-                        string errorString = mod;
-                        Package modPackage = ThunderstoreAPI.GetPackage(mod);
-                        if (modPackage != null)
-                        {
-                            string versionNumber = Regex.Match(mod, @"\[([\d.]+)\]").Success ? $"v{Regex.Match(mod, @"\[([\d.]+)\]").Value}" : "No version number found";
-                            errorString = $"\n\t--Name: {mod}\n\t--Link: {modPackage.PackageUrl}\n\t--Version: {versionNumber}\n\t--Downloads: {modPackage.Versions[0].Downloads}\n\t--Categories: [{string.Join(", ", modPackage.Categories)}]";
-                        }
-                        ModNotifyBase.Logger.LogError(errorString);
-                    }
-                    ModNotifyBase.Logger.LogWarning($"Mods \"{lobbyName}\" may not be compatible with:\n\t\t{incompList}");
-                    serverModList = null;
+                    ModNotifyBase.Logger.Log(BepInEx.Logging.LogLevel.All, $"\nMissing mods from lobby \"{lobbyName}\":");
+                    ModDataUtil.LogModList(missingMods);
+                    ModNotifyBase.Logger.Log(BepInEx.Logging.LogLevel.All, $"Mods \"{lobbyName}\" may not be compatible with:\n\t\t{incompList}");
+                    serverModList.Clear(); // Clear list after displaying information.
                 }
             }
             if (newVersion)
@@ -208,24 +108,16 @@ namespace CompatibilityChecker.Netcode
         [HarmonyPostfix]
         public static void timeoutPatch()
         {
-            if (GameNetworkManager.Instance.currentLobby != null && serverModList == null)
+            if (GameNetworkManager.Instance.currentLobby != null && serverModList.Count == 0)
             {
-                serverModList = GameNetworkManager.Instance.currentLobby.Value.GetData("mods")?.Split(ModNotifyBase.seperator);
-            }
-        }
-
-        [HarmonyPatch(typeof(GameNetworkManager), "Singleton_OnClientConnectedCallback")]
-        [HarmonyPostfix]
-        public static void ConnectCallbackPatch()
-        {
-            Lobby? currentLobby = GameNetworkManager.Instance.currentLobby;
-            if (StartOfRound.Instance != null && currentLobby != null)
-            {
-                if (currentLobby.Value.GetData("mods").IsNullOrWhiteSpace())
+                string newData = GameNetworkManager.Instance.currentLobby.Value.GetData("RyokuneCompatibilityChecker");
+                if (newData.IsNullOrWhiteSpace())
                 {
-                    ModNotifyBase.Logger.LogInfo("Setting lobbys mods");
-                    CoroutineHandler.Instance.NewCoroutine(SetLobbyData(currentLobby.Value));
+                    string oldData = GameNetworkManager.Instance.currentLobby.Value.GetData("mods");
+                    serverModList = StringCompressionUtil.SetListTo(serverModList, oldData);
+                    return;
                 }
+                ModNotifyBase.Logger.LogWarning("UH OH! NOT GOOD!"); // really bad if this happens.
             }
         }
     }

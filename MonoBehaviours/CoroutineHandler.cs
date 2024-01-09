@@ -53,5 +53,11 @@ namespace CompatibilityChecker.MonoBehaviours
             // Remove the coroutine from the list when it's done
             runningCoroutines.Remove(coroutine.GetType());
         }
+
+        public new void StopAllCoroutines() 
+        {
+            base.StopAllCoroutines();
+            runningCoroutines.Clear();
+        }
     }
 }

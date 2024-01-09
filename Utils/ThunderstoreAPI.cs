@@ -1,4 +1,5 @@
-﻿using Newtonsoft.Json;
+﻿using CompatibilityChecker.MonoBehaviours;
+using Newtonsoft.Json;
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -30,10 +31,15 @@ namespace CompatibilityChecker.Utils
 		[JsonProperty("versions")]
 		public Version[] Versions;
 
-		public long TotalDownloads;
+		[JsonProperty("uuid4")]
+		public string Uuid4;
 
 		[JsonProperty("is_deprecated")]
 		public bool IsDeprecated;
+
+		public string ShorterId;
+
+		public long TotalDownloads;
 	}
 	[Serializable]
 	public class Version
@@ -57,36 +63,58 @@ namespace CompatibilityChecker.Utils
 		public Uri WebsiteUrl;
 	}
 	public static class ThunderstoreAPI
-    {
-        private const string ApiBaseUrl = "https://thunderstore.io/c/lethal-company/api/v1/package/";
-        private static List<Package> packages;
+	{
+		private const string ApiBaseUrl = "https://thunderstore.io/c/lethal-company/api/v1/package/";
+		private static List<Package> packages;
 
-        public static List<Package> Packages => packages;
+		public static List<Package> Packages => packages;
 
-        public static async Task InitializeThunderstorePackagesAsync(Action onComplete)
+		public static bool Failed { get; private set; }
+
+
+		private static async Task RetryOnExceptionAsync(Func<Task> action, int retries)
+		{
+			for (int i = 1; i <= retries; i++)
+			{
+				try
+				{
+					ModNotifyBase.Logger.Log(BepInEx.Logging.LogLevel.All, $"Loading Thunderstore packages try {i}/{retries}");
+					await action();
+					break;
+				}
+				catch (Exception ex)
+				{
+					if (i == retries)
+					{
+						Failed = true;
+						ModNotifyBase.Logger.LogError($"Failed to initialize Thunderstore packages. Error: {ex.Message}");
+					}
+				}
+			}
+		}
+
+		public static async Task InitializeThunderstorePackagesAsync()
         {
-            try
-            {
-                using (HttpClient httpClient = new HttpClient())
-                {
-                    string jsonResponse = await httpClient.GetStringAsync(ApiBaseUrl);
-                    packages = JsonConvert.DeserializeObject<List<Package>>(jsonResponse);
-                    ModNotifyBase.Logger.LogInfo($"ThunderstoreAPI Initialized! Got packages: {packages.Count()}");
-					foreach(Package pack in packages)
-                    {
-						foreach(Version ver in pack.Versions)
-                        {
+			Failed = false;
+			await RetryOnExceptionAsync(async () => 
+			{
+				using (HttpClient httpClient = new HttpClient())
+				{
+					httpClient.Timeout = TimeSpan.FromSeconds(ModNotifyBase.ThunderstoreTimeout.Value);
+					string jsonResponse = await httpClient.GetStringAsync(ApiBaseUrl);
+					ModNotifyBase.Logger.LogInfo($"Thunderstore API responded! Deserializing..");
+					packages = JsonConvert.DeserializeObject<List<Package>>(jsonResponse);
+					ModNotifyBase.Logger.LogInfo($"ThunderstoreAPI Initialized! Got packages: {packages.Count}");
+					foreach (Package pack in packages)
+					{
+						foreach (Version ver in pack.Versions)
+						{
 							pack.TotalDownloads += ver.Downloads;
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-				ModNotifyBase.Logger.LogError($"Failed to initialize Thunderstore packages. Error: {ex.Message}");
-            }
-
-            onComplete?.Invoke();
+						}
+						pack.ShorterId = pack.Uuid4.Substring(0, 5) + pack.Uuid4.Substring(pack.Uuid4.Length - 5, 5);
+					}
+				}
+			}, ModNotifyBase.ThunderstoreRetries.Value);
         }
 
 		public static bool IsSimilar(string s1, string s2)
@@ -134,10 +162,9 @@ namespace CompatibilityChecker.Utils
 
 		private static bool IsMatchingName(Package package, string searchString)
         {
-			//string replaced = Regex.Replace(package.Name, @"[\s_-]+(\w)", m => m.Groups[0].Value.Substring(0, 0) + m.Groups[1].Value.ToUpper());
-			string[] packageSplit = Regex.Split(package.Name, @"(?<=[a-z])(?=[A-Z])|[\s_\-]");
+			string[] packageSplit = Regex.Split(package.Name.Replace("lethalcompany","",StringComparison.OrdinalIgnoreCase), @"(?<=[a-z])(?=[A-Z])|[\s_\-]");
 			string[] searchStringSplit = Regex.Split(searchString, @"(?<=[a-z])(?=[A-Z])|[\s_\-]");
-			int minCommonKeywords = packageSplit.Length > searchStringSplit.Length ? searchStringSplit.Length/2 : packageSplit.Length/2; // Set your desired threshold here
+			int minCommonKeywords = 2; // Set your desired threshold here
 			int commonKeywordsCount = packageSplit.Count(token => searchStringSplit.Contains(token, StringComparer.OrdinalIgnoreCase));
 			bool keywordCheck = commonKeywordsCount >= minCommonKeywords;
 			return keywordCheck;
@@ -172,13 +199,16 @@ namespace CompatibilityChecker.Utils
 					continue;
 				}
 				string noSpace = Regex.Replace(pkg.Name, @"[\s\-_]", "");
-				if (noSpace.Equals(searchString, StringComparison.OrdinalIgnoreCase) || searchString.Contains(noSpace, StringComparison.OrdinalIgnoreCase) || noSpace.Contains(searchString, StringComparison.OrdinalIgnoreCase))
+				string noSpaceSearch = Regex.Replace(searchString, @"[\s\-_]", "");
+				noSpace = noSpace.Replace("lethalcompany", "", StringComparison.OrdinalIgnoreCase);
+				noSpaceSearch = noSpaceSearch.Replace("lethalcompany", "", StringComparison.OrdinalIgnoreCase);
+				if (noSpace.Equals(noSpaceSearch, StringComparison.OrdinalIgnoreCase))
                 {
 					if(value == null)
                     {
 						value = pkg;
                     }
-                    if (pkg.TotalDownloads >= value?.TotalDownloads) 
+                    if (pkg.TotalDownloads > value?.TotalDownloads) 
 					{
 						value = pkg;
 					}
@@ -187,7 +217,12 @@ namespace CompatibilityChecker.Utils
 			return value;
 		}
 
-		public static Package GetPackage(string searchString, BepInEx.PluginInfo info)
+		public static Package GetPackageUsingID(string id)
+        {
+			return Packages?.FirstOrDefault(package => package.ShorterId.Equals(id));
+        }
+
+		public static Package GetPackage(string searchString, BepInEx.PluginInfo info) // If anyone can figure out a better search algorithm, please PR..
 		{
 			//return Packages?.FirstOrDefault(package => IsMatchingPackage(info, package, searchString) );
 			Package value = null;
@@ -198,34 +233,64 @@ namespace CompatibilityChecker.Utils
                 {
 					continue;
                 }
-                if (info.Metadata.GUID.Split(".").Contains(pkg.Owner))
+                if (info.Metadata.GUID.Split(".").Contains(pkg.Owner, StringComparer.OrdinalIgnoreCase))
                 {
 					owned = true;
                 }
 				string noSpace = Regex.Replace(pkg.Name, @"[\s\-_]", "");
-				if (noSpace.Equals(searchString, StringComparison.OrdinalIgnoreCase) || noSpace.Equals(info.Metadata.Name, StringComparison.OrdinalIgnoreCase) || noSpace.Equals(info.Metadata.GUID, StringComparison.OrdinalIgnoreCase))
+				string noSpaceSearch = Regex.Replace(searchString, @"[\s\-_]", "");
+				noSpace = noSpace.Replace("lethalcompany", "", StringComparison.OrdinalIgnoreCase);
+				noSpaceSearch = noSpaceSearch.Replace("lethalcompany", "", StringComparison.OrdinalIgnoreCase);
+				if (noSpace.Equals(noSpaceSearch, StringComparison.OrdinalIgnoreCase) || noSpace.Equals(info.Metadata.Name, StringComparison.OrdinalIgnoreCase) || noSpace.Equals(info.Metadata.GUID, StringComparison.OrdinalIgnoreCase))
 				{
                     if (owned)
                     {
 						return pkg;
                     }
-					value = pkg;
+					if (value == null)
+					{
+						value = pkg;
+					}
+					if (pkg.TotalDownloads > value.TotalDownloads)
+					{
+						value = pkg;
+					}
+					continue;
 				}
-				if (searchString.Contains(noSpace, StringComparison.OrdinalIgnoreCase) || noSpace.Contains(searchString, StringComparison.OrdinalIgnoreCase) || noSpace.Contains(info.Metadata.Name, StringComparison.OrdinalIgnoreCase) || noSpace.Contains(info.Metadata.GUID, StringComparison.OrdinalIgnoreCase))
+				if (noSpaceSearch.Contains(noSpace, StringComparison.OrdinalIgnoreCase) || noSpace.Contains(noSpaceSearch, StringComparison.OrdinalIgnoreCase) || noSpace.Contains(info.Metadata.Name, StringComparison.OrdinalIgnoreCase) || noSpace.Contains(info.Metadata.GUID, StringComparison.OrdinalIgnoreCase))
 				{
-					value = pkg;
+					if (value == null)
+					{
+						value = pkg;
+					}
+					if (pkg.TotalDownloads > value.TotalDownloads)
+					{
+						value = pkg;
+					}
+					continue;
 				}
-				if(IsSimilar(pkg.Name, searchString))
+				if(IsSimilar(noSpace, noSpaceSearch))
                 {
-					value = pkg;
-                }
+					if (owned)
+					{
+						return pkg;
+					}
+					if (value == null)
+                    {
+						value = pkg;
+                    }
+                    if (pkg.TotalDownloads > value.TotalDownloads) 
+					{
+						value = pkg;
+					}
+				}
 			}
 			return value;
 		}
 
-		public static IEnumerator Initialize(Action onComplete = null)
+		public static IEnumerator Initialize()
 		{
-			yield return InitializeThunderstorePackagesAsync(onComplete);
+			yield return InitializeThunderstorePackagesAsync();
 		}
 	}
 }
