@@ -1,4 +1,4 @@
-# CompatibilityChecker
+# CompatibilityChecker [Deprecated]
 
 # Compatibility Checker is deprecated!
 Firstly, thank you everyone for downloading this mod, I honestly thought this small personal project of mine wouldn't be of use to anyone, especially in this scale. But now lets address the elephant in the room and answer some questions.
