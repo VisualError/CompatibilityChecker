@@ -30,7 +30,7 @@ eg:
 ### Is this mod Open Source?
 * Yep! It's liscensed as MIT. [GitHub](https://github.com/VisualError/CompatibilityChecker/)
 
-## Overview
+## Overview [Deprecated]
 
 Enhances your multiplayer experience by notifying you of the required mods when failing to join modded servers. (Required both by host and client.)
 
