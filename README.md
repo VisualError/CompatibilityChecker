@@ -1,5 +1,35 @@
 # CompatibilityChecker
 
+# Compatibility Checker is deprecated!
+Firstly, thank you everyone for downloading this mod, I honestly thought this small personal project of mine wouldn't be of use to anyone, especially in this scale. But now lets address the elephant in the room and answer some questions.
+# Why deprecate?
+Why the INJUSTICE!? Why not actively update it!? After promises of creating a usable UI!? You lied to us! 😒😒<br/> Now. calm down. I'll explain:
+<br/><br/>**After some consideration**, I have deemed myself incompetent for maintaining such a widely used mod such as the Compatibility Checker. And so.. I shall forcefully pass the torch down to more competent developers! haha!
+<br/><br/>I shall state that due to my inexpertise, and lack of knowledge regarding C#, me attempting to revive this mod will only inevitably slow down the process of me eventually deprecating it and building up false promises..<br/> But alas, not all hope is lost!<br/><br/>I didn't do this just on a whim, as eventually there *will* be better replacements for Compatibility Checker given some time in the future. Check out the [Modding Discord](https://discord.gg/lcmod) for more information. <br/>(Namely: Lobby Mod List Syncing Library & LethalModManager)
+
+Given the recent influx of mods appearing on Thunderstore, this mod would require *complete* overhaul for it to work as its intended to. Which I sadly do not have enough time to do so, especially in a timely manner.. (blame my lazy bones for that)<br/>
+And as a punch in the gut, this mod had already harbored *numerous* of silly, unresolved issues such as, but not limited to:<br/>
+eg:
+* A slight... difficulty in locating the right mod. *sad trombone*
+* Potential hiccups when encountering special characters (particularly in mods with foreign letters).
+* Juggling the responsibilities of updating and maintaining this mod solo.
+* Issues with Lethal Company v49
+* Challenge moons not showing up in the server list.
+* Issues with slow internet connections.
+* Horrible code
+* This mod just... isnt it
+
+(And let's be real, am just a regular person indulging in some modding fun – not exactly the go-to expert for a widely used community mod.)
+
+# FAQ:
+### I liked the lobby search feature, are there any other mods that has that feature?
+* Absolutely! Don't worry; I made another mod just for that feature called: [Better Lobbies](https://thunderstore.io/c/lethal-company/p/Ryokune/Better_Lobbies/)<br/>
+(not to be confused with [Bigger Lobby](https://thunderstore.io/c/lethal-company/p/bizzlemip/BiggerLobby/))
+### Would there be a replacement for Compatibility Checker?
+* There are a few that is currently being made in the [Modding Discord](https://discord.gg/lcmod). None are currently released but I will update this mod in order to redirect users to said mods once they release.
+### Is this mod Open Source?
+* Yep! It's liscensed as MIT. [GitHub](https://github.com/VisualError/CompatibilityChecker/)
+
 ## Overview
 
 Enhances your multiplayer experience by notifying you of the required mods when failing to join modded servers. (Required both by host and client.)
