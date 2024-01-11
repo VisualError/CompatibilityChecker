@@ -1,4 +1,4 @@
-# CompatibilityChecker (Thanks Bobbie for the name suggestion.)
+# CompatibilityChecker
 
 ## Overview
 
